@@ -36,6 +36,63 @@ def utcnow():
     return datetime.now(timezone.utc).isoformat()
 
 
+def hash_password(password):
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 120000, dklen=32).hex()
+    return salt.hex() + "$" + digest
+
+
+def default_state():
+    now = utcnow()
+    return {
+        "version": 1,
+        "users": [
+            {"id": "u_manager", "username": "manager", "name": "Kitchen Manager", "role": "manager", "jobTitle": "Kitchen Manager", "password": hash_password("ChangeMe123!"), "active": True},
+            {"id": "u_keith", "username": "keith", "name": "Keith Davies", "role": "staff", "jobTitle": "Chef", "password": hash_password("Kitchen123!"), "active": True},
+            {"id": "u_ian", "username": "ian", "name": "Ian Park", "role": "staff", "jobTitle": "Chef", "password": hash_password("Kitchen123!"), "active": True},
+            {"id": "u_harry", "username": "harry", "name": "Harry Duckworth", "role": "staff", "jobTitle": "Chef", "password": hash_password("Kitchen123!"), "active": True},
+        ],
+        "appliances": [
+            {"id":"a0","name":"Fridge 1","type":"fridge","target":5,"critical":8},
+            {"id":"a1","name":"Fridge 2","type":"fridge","target":5,"critical":8},
+            {"id":"a2","name":"Fridge 3","type":"fridge","target":5,"critical":8},
+            {"id":"a3","name":"Freezer 1","type":"freezer","target":-18,"critical":-12},
+            {"id":"a4","name":"Freezer 2","type":"freezer","target":-18,"critical":-12},
+            {"id":"a5","name":"Freezer 3","type":"freezer","target":-18,"critical":-12},
+            {"id":"a6","name":"Cold Room","type":"fridge","target":5,"critical":8},
+        ],
+        "checks": [], "dailyChecks": [], "stock": [], "recipes": [], "menus": [],
+        "operations": [], "suppliers": [], "waste": [], "training": [], "sales": [],
+        "paperwork": [], "audit": [], "deliveries": [], "stockMovements": [],
+        "prepLists": [], "shifts": [], "cleaningSchedules": [], "scheduleCompletions": [],
+        "menuImports": [],
+        "settings": {
+            "businessName": "The Coach & Horses",
+            "modules": {},
+            "createdAt": now,
+            "serverInitialised": True
+        }
+    }
+
+
+def ensure_initial_state():
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM app_state WHERE id=1")
+            if cur.fetchone():
+                return
+            state = default_state()
+            cur.execute(
+                "INSERT INTO app_state(id,state,revision,updated_at,updated_by) VALUES(1,%s::jsonb,1,NOW(),'server-bootstrap')",
+                (json.dumps(state, ensure_ascii=False, separators=(",", ":")),),
+            )
+            cur.execute(
+                "INSERT INTO server_audit(username,action,revision,details) VALUES(%s,%s,%s,%s::jsonb)",
+                ("system", "server_bootstrap", 1, json.dumps({"message": "Initial manager and chef accounts created"})),
+            )
+        conn.commit()
+
+
 def init_db():
     with connect() as conn:
         with conn.cursor() as cur:
@@ -411,6 +468,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 init_db()
+ensure_initial_state()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "10000"))
     print(f"Coach & Horses Kitchen Pro listening on 0.0.0.0:{port}; postgres storage")
