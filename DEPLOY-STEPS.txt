@@ -1,0 +1,8 @@
+1. Make a private GitHub repository named coach-horses-kitchen.
+2. Upload app.py, index.html, requirements.txt, render.yaml, README.md and .gitignore.
+3. In Neon, create a project and copy the PostgreSQL connection string.
+4. In Render, create a Blueprint from the GitHub repository.
+5. Paste the Neon string into DATABASE_URL.
+6. Paste the OpenAI API key into OPENAI_API_KEY if AI is required.
+7. Deploy and open the onrender.com address.
+8. Sign in as manager / ChangeMe123! and change the password.
