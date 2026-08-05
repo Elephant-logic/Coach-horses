@@ -31,27 +31,43 @@
       return ideas.slice(0,12);
     }
 
-    function userPromptFromBody(body){
-      try{
-        const p=JSON.parse(body||'{}');
-        if(typeof p.input==='string') return p.input;
-        if(Array.isArray(p.input)) return p.input.map(x=>typeof x==='string'?x:(x&&x.content)||'').join(' ');
-      }catch(_){ }
+    function promptText(input){
+      if(typeof input==='string') return input;
+      if(Array.isArray(input)){
+        return input.map(x=>{
+          if(typeof x==='string') return x;
+          if(!x) return '';
+          if(typeof x.content==='string') return x.content;
+          if(Array.isArray(x.content)) return x.content.map(p=>p&&p.text||'').join(' ');
+          return '';
+        }).join(' ');
+      }
       return '';
+    }
+
+    function detectIdeaRequest(text){
+      const t=String(text||'').toLowerCase();
+      if(!/\b(chicken|beef|pork|fish|lamb|vegetarian|vegan)\b/.test(t)) return '';
+      if(!/\b(ideas?|dishes|dish ideas|recipe ideas)\b/.test(t)) return '';
+      if(!/\b(give|suggest|show|list|make|create)\b/.test(t)) return '';
+      const protein=(t.match(/\b(chicken|beef|pork|fish|lamb|vegetarian|vegan)\b/)||[])[1];
+      return protein||'';
     }
 
     window.fetch=async function(input,init){
       const url=typeof input==='string'?input:(input&&input.url)||'';
       let nextInit=init;
       if(url.includes('/api/openai/responses')&&init&&typeof init.body==='string'){
-        const prompt=userPromptFromBody(init.body);
-        if(/\b(make|give|suggest|create)\b[\s\S]{0,40}\b(recipe ideas?|dishes)\b/i.test(prompt)&&/\b(chicken|beef|pork|fish|lamb|vegetarian|vegan)\b/i.test(prompt)&&!/^\s*(make|save|approve)\s+(all|one|\d+)/i.test(prompt)){
-          try{
-            const payload=JSON.parse(init.body);
-            payload.input=String(payload.input||'')+'\nReturn a numbered list of dish names only. Do not create or save recipes yet. The user will choose one dish or say make all.';
+        try{
+          const payload=JSON.parse(init.body);
+          const rawPrompt=promptText(payload.input);
+          const protein=detectIdeaRequest(rawPrompt);
+          if(protein&&!/^\s*(make|save|approve)\s+(all|one|\d+)/i.test(rawPrompt)){
+            payload.input='You are the AI kitchen manager for a British pub kitchen. The user wants dish ideas, not image analysis. Do not ask for photos, images, uploads, menus, files, clarification, or more information. Return exactly 8 practical '+protein+' dish names as a numbered list. Dish names only, one per line. Do not include recipes, ingredients, explanations, headings, or markdown. Example format: 1. Dish name';
+            payload.instructions='Follow the user request directly. Never request an image or file for dish-idea questions.';
             nextInit=Object.assign({},init,{body:JSON.stringify(payload)});
-          }catch(_){ }
-        }
+          }
+        }catch(_){ }
       }
       const res=await originalFetch(input,nextInit);
       if(url.includes('/api/openai/responses')){
@@ -83,7 +99,7 @@
     }
 
     async function requestRecipe(dishName){
-      const prompt='Create a complete professional kitchen recipe for '+dishName+'. Return ONLY valid JSON with keys name, category, portions, ingredients (array of {name,qty,unit}), method, allergens, cost, sellingPrice. Include practical quantities and a clear method. Do not return markdown.';
+      const prompt='Create a complete professional British pub kitchen recipe for '+dishName+'. Return ONLY valid JSON with keys name, category, portions, ingredients (array of {name,qty,unit}), method, allergens, cost, sellingPrice. Include practical quantities and a clear method. Do not ask for images or more information. Do not return markdown.';
       const res=await originalFetch('/api/openai/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'gpt-4.1-mini',input:prompt,temperature:0.2})});
       const data=await res.json();
       if(!res.ok) throw new Error(data?.error?.message||'AI request failed');
@@ -110,7 +126,7 @@
       if(!lastAIText) return typeof toast==='function'&&toast('No AI recipe draft found yet','bad');
       saving=true;
       try{
-        const prompt='Convert the following recipe draft into ONLY valid JSON with keys name, category, portions, ingredients (array of {name,qty,unit}), method, allergens, cost, sellingPrice. Do not return markdown. Draft:\n'+lastAIText;
+        const prompt='Convert the following recipe draft into ONLY valid JSON with keys name, category, portions, ingredients (array of {name,qty,unit}), method, allergens, cost, sellingPrice. Do not ask for images or clarification. Do not return markdown. Draft:\n'+lastAIText;
         const res=await originalFetch('/api/openai/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'gpt-4.1-mini',input:prompt,temperature:0.1})});
         const data=await res.json();
         if(!res.ok) throw new Error(data?.error?.message||'AI request failed');
