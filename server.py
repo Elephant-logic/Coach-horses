@@ -43,7 +43,6 @@ def extract_embedded_paperwork():
 
 
 def restore_original_paperwork():
-    """One-time, non-destructive migration into the existing shared state."""
     papers = extract_embedded_paperwork()
     if not papers:
         print('No embedded paperwork found; migration skipped')
@@ -72,11 +71,10 @@ def restore_original_paperwork():
                 ('system', 'restore_original_paperwork', revision, json.dumps({'added': len(added)})),
             )
         conn.commit()
-    print(f'Restored {len(added)} original paperwork records into Neon')
+    print(f'Restored {len(added)} original paperwork records')
 
 
 def harden_legacy_login(raw):
-    """Hide only the obsolete login hints before first paint without removing app markup."""
     guard = '<style id="secure-login-guard">#resetLogin,.login-note{display:none!important}#loginForm input[name="password"]{color:transparent!important;text-shadow:none!important}</style>'
     if 'secure-login-guard' not in raw:
         raw = raw.replace('</head>', guard + '</head>', 1)
@@ -107,9 +105,10 @@ class Handler(app.Handler):
                 '<script src="/ai_recipe_save_patch.js?v=3"></script>'
                 '<script src="/recipe_category_patch.js?v=3"></script>'
                 '<script src="/recipe_seed_patch.js?v=1"></script>'
-                '<script src="/menu_prep_zero_stock_patch.js?v=1"></script>'
+                '<script src="/recipe_seed_v2_patch.js?v=1"></script>'
+                '<script src="/menu_prep_zero_stock_patch.js?v=2"></script>'
             )
-            if '/menu_prep_zero_stock_patch.js' not in raw:
+            if '/recipe_seed_v2_patch.js' not in raw:
                 before, found, after = raw.rpartition(marker)
                 if found:
                     raw = before + scripts + found + after
@@ -129,7 +128,8 @@ class Handler(app.Handler):
             '/login_cleanup_patch.js', '/recipe_menu_patch.js', '/recipe_management_patch.js',
             '/prep_delete_patch.js', '/single_dish_cleanup_patch.js', '/menu_builder_patch.js',
             '/menu_photo_import_patch.js', '/clockin_session_patch.js', '/ai_recipe_save_patch.js',
-            '/recipe_category_patch.js', '/recipe_seed_patch.js', '/menu_prep_zero_stock_patch.js'
+            '/recipe_category_patch.js', '/recipe_seed_patch.js', '/recipe_seed_v2_patch.js',
+            '/menu_prep_zero_stock_patch.js'
         )
         if path in patch_files:
             data = (BASE_DIR / path.lstrip('/')).read_bytes()
