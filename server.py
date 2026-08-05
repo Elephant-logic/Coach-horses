@@ -105,7 +105,7 @@ class Handler(app.Handler):
                 '<script src="/menu_photo_import_patch.js?v=1"></script>'
                 '<script src="/clockin_session_patch.js?v=1"></script>'
                 '<script src="/ai_recipe_save_patch.js?v=3"></script>'
-                '<script src="/recipe_category_patch.js?v=1"></script>'
+                '<script src="/recipe_category_patch.js?v=2"></script>'
                 '<script src="/recipe_seed_patch.js?v=1"></script>'
             )
             if '/recipe_seed_patch.js' not in raw:
