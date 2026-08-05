@@ -8,7 +8,8 @@
 
     const css=document.createElement('style');
     css.textContent=`
-      .modal-wrap{display:flex!important;align-items:center!important;justify-content:center!important;padding:12px!important;overflow:hidden!important}
+      .modal-wrap{align-items:center!important;justify-content:center!important;padding:12px!important;overflow-y:auto!important}
+      .modal-wrap[hidden],.modal-wrap.hidden,.modal-wrap[aria-hidden="true"]{display:none!important}
       .modal{width:min(760px,100%)!important;max-height:calc(100dvh - 24px)!important;overflow:auto!important;overscroll-behavior:contain}
       .delivery-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
       .delivery-grid .full{grid-column:1/-1}
@@ -49,7 +50,9 @@
         if(form){form.condition.value=x.condition||'Good';form.decision.value=x.decision||'Accepted';}
         return;
       }
-      document.getElementById('deliveryCheckForm').onsubmit=async function(e){
+      const form=document.getElementById('deliveryCheckForm');
+      if(!form) return;
+      form.onsubmit=async function(e){
         e.preventDefault();
         const f=Object.fromEntries(new FormData(e.target));
         const chilled=f.chilledTemp===''?'':Number(f.chilledTemp);
