@@ -106,7 +106,7 @@ class Handler(app.Handler):
                 '<script src="/recipe_category_patch.js?v=3"></script>'
                 '<script src="/recipe_seed_patch.js?v=1"></script>'
                 '<script src="/recipe_seed_v2_patch.js?v=1"></script>'
-                '<script src="/menu_prep_zero_stock_patch.js?v=2"></script>'
+                '<script src="/menu_prep_zero_stock_patch.js?v=3"></script>'
             )
             if '/recipe_seed_v2_patch.js' not in raw:
                 before, found, after = raw.rpartition(marker)
