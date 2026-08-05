@@ -1,10 +1,24 @@
 (function(){
   const nativeFetch=window.fetch.bind(window);
-  let serverAI=false;
+  let serverAI=true;
+
+  async function jsonSafeResponse(response){
+    const text=await response.text();
+    try{
+      JSON.parse(text);
+      return new Response(text,{status:response.status,statusText:response.statusText,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
+    }catch(_){
+      const looksHtml=/^\s*</.test(text)||/<!doctype|<html/i.test(text);
+      const message=looksHtml
+        ? 'The AI service returned a web page instead of data. Please try again after the server finishes restarting.'
+        : 'The AI service returned an unreadable response.';
+      return new Response(JSON.stringify({error:{message:message}}),{status:response.ok?502:response.status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
+    }
+  }
 
   async function detect(){
     try{
-      const r=await nativeFetch('/api/config',{cache:'no-store'});
+      const r=await nativeFetch('/api/config',{cache:'no-store',credentials:'same-origin'});
       const c=await r.json();
       serverAI=!!c.aiEnabled;
       window.__serverAIEnabled=serverAI;
@@ -16,18 +30,31 @@
         };
       }
       refreshLabels();
-    }catch(e){console.warn('AI config check failed',e);}
+    }catch(e){
+      console.warn('AI config check failed',e);
+      serverAI=true;
+    }
   }
 
   window.fetch=async function(input,init){
     const url=typeof input==='string'?input:(input&&input.url)||'';
-    if(serverAI && url.indexOf('https://api.openai.com/v1/responses')===0){
+    const isOpenAI=url.indexOf('https://api.openai.com/v1/responses')===0;
+    const isProxy=url==='/api/openai/responses'||url.indexOf('/api/openai/responses?')===0;
+    if(isOpenAI){
       const opts=Object.assign({},init||{});
       const headers=new Headers(opts.headers||{});
       headers.delete('Authorization');
       headers.set('Content-Type','application/json');
       opts.headers=headers;
-      return nativeFetch('/api/openai/responses',opts);
+      opts.credentials='same-origin';
+      const response=await nativeFetch('/api/openai/responses',opts);
+      return jsonSafeResponse(response);
+    }
+    if(isProxy){
+      const opts=Object.assign({},init||{});
+      opts.credentials='same-origin';
+      const response=await nativeFetch(input,opts);
+      return jsonSafeResponse(response);
     }
     return nativeFetch(input,init);
   };
