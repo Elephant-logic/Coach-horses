@@ -10,10 +10,29 @@
     const norm=v=>String(v||'').trim().toLowerCase();
     const courseMap={starter:'Starter',starters:'Starter',main:'Main',mains:'Main',dessert:'Dessert',desserts:'Dessert',side:'Side',sides:'Side',sauce:'Sauce',sauces:'Sauce',other:'Other'};
     const typeMap={meat:'Meat',fish:'Fish',vegetarian:'Vegetarian',vegan:'Vegan',dessert:'Dessert',desserts:'Dessert',other:'Other'};
+    const fixed={
+      'chicken liver parfait':['Starter','Meat'],
+      'smoked haddock fishcake':['Starter','Fish'],
+      'wild mushroom on toast':['Starter','Vegetarian'],
+      'roast tomato and basil soup':['Starter','Vegan'],
+      'steak and ale pie':['Main','Meat'],
+      'pan-roasted chicken supreme':['Main','Meat'],
+      'beer-battered haddock and chips':['Main','Fish'],
+      'salmon with lemon butter sauce':['Main','Fish'],
+      'mushroom and spinach wellington':['Main','Vegetarian'],
+      'chickpea and sweet potato curry':['Main','Vegan'],
+      'sticky toffee pudding':['Dessert','Dessert'],
+      'apple and blackberry crumble':['Dessert','Dessert'],
+      'triple chocolate brownie':['Dessert','Dessert'],
+      'herb roasted new potatoes':['Side','Vegan'],
+      'cauliflower cheese':['Side','Vegetarian'],
+      'red wine jus':['Sauce','Other'],
+      'tartare sauce':['Sauce','Other']
+    };
 
     function inferCourse(r){
-      // Explicit saved course/category always wins. This prevents a word in the
-      // dish name from moving a recipe into the wrong menu section.
+      const named=fixed[norm(r.name)];
+      if(named) return named[0];
       const explicit=courseMap[norm(r.course)]||courseMap[norm(r.category)];
       if(explicit) return explicit;
       const text=norm(r.name||'');
@@ -25,6 +44,8 @@
     }
 
     function inferType(r){
+      const named=fixed[norm(r.name)];
+      if(named) return named[1];
       const explicit=typeMap[norm(r.foodCategory)]||typeMap[norm(r.type)];
       if(explicit) return explicit;
       const text=norm(r.name||'');
