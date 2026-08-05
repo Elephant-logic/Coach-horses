@@ -100,7 +100,7 @@ class Handler(app.Handler):
                 '<script src="/recipe_menu_patch.js?v=1"></script>'
                 '<script src="/recipe_management_patch.js?v=1"></script>'
                 '<script src="/prep_delete_patch.js?v=1"></script>'
-                '<script src="/single_dish_cleanup_patch.js?v=1"></script>'
+                '<script src="/single_dish_cleanup_patch.js?v=2"></script>'
                 '<script src="/menu_builder_patch.js?v=1"></script>'
                 '<script src="/menu_photo_import_patch.js?v=1"></script>'
                 '<script src="/clockin_session_patch.js?v=1"></script>'
