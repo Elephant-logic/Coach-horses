@@ -5,15 +5,21 @@ import app
 
 BASE_DIR = Path(__file__).resolve().parent
 
+
 class Handler(app.Handler):
     def do_GET(self):
         path = self.path.split('?', 1)[0]
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
             marker = '</body>'
-            script = '<script src="/delivery_patch.js?v=3"></script>'
-            if script not in raw and marker in raw:
-                raw = raw.replace(marker, script + marker, 1)
+            script = '<script src="/delivery_patch.js?v=4"></script>'
+            # Inject only before the final real closing body tag. The HTML contains
+            # '</body>' text inside JavaScript templates, so replacing the first
+            # occurrence corrupts the app and exposes source code on screen.
+            if script not in raw:
+                before, found, after = raw.rpartition(marker)
+                if found:
+                    raw = before + script + found + after
             data = raw.encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -34,6 +40,7 @@ class Handler(app.Handler):
             self.wfile.write(data)
             return
         super().do_GET()
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '10000'))
