@@ -75,17 +75,28 @@ def restore_original_paperwork():
     print(f'Restored {len(added)} original paperwork records into Neon')
 
 
+def harden_legacy_login(raw):
+    """Hide only the obsolete login hints before first paint without removing app markup."""
+    guard = '<style id="secure-login-guard">#resetLogin,.login-note{display:none!important}#loginForm input[name="password"]{color:transparent!important;text-shadow:none!important}</style>'
+    if 'secure-login-guard' not in raw:
+        raw = raw.replace('</head>', guard + '</head>', 1)
+    raw = raw.replace('value="ChangeMe123!" autocomplete="current-password"', 'value="" autocomplete="current-password"')
+    raw = raw.replace('value="Kitchen123!" autocomplete="current-password"', 'value="" autocomplete="current-password"')
+    return raw
+
+
 class Handler(app.Handler):
     def do_GET(self):
         path = self.path.split('?', 1)[0]
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
+            raw = harden_legacy_login(raw)
             marker = '</body>'
             scripts = (
                 '<script src="/delivery_patch.js?v=7"></script>'
                 '<script src="/ai_server_patch.js?v=1"></script>'
                 '<script src="/compliance_patch.js?v=1"></script>'
-                '<script src="/login_cleanup_patch.js?v=2"></script>'
+                '<script src="/login_cleanup_patch.js?v=3"></script>'
                 '<script src="/recipe_menu_patch.js?v=1"></script>'
                 '<script src="/recipe_management_patch.js?v=1"></script>'
                 '<script src="/prep_delete_patch.js?v=1"></script>'
@@ -101,7 +112,7 @@ class Handler(app.Handler):
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.send_header('Content-Length', str(len(data)))
-            self.send_header('Cache-Control', 'no-store, max-age=0')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             self.send_header('Pragma', 'no-cache')
             self.send_header('Expires', '0')
             self.send_header('X-Content-Type-Options', 'nosniff')
@@ -119,7 +130,9 @@ class Handler(app.Handler):
             self.send_response(200)
             self.send_header('Content-Type', 'application/javascript; charset=utf-8')
             self.send_header('Content-Length', str(len(data)))
-            self.send_header('Cache-Control', 'no-store, max-age=0')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.end_headers()
             self.wfile.write(data)
