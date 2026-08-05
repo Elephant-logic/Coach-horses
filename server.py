@@ -81,11 +81,14 @@ class Handler(app.Handler):
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
             marker = '</body>'
-            script = '<script src="/delivery_patch.js?v=4"></script>'
-            if script not in raw:
+            scripts = (
+                '<script src="/delivery_patch.js?v=7"></script>'
+                '<script src="/ai_server_patch.js?v=1"></script>'
+            )
+            if '/ai_server_patch.js' not in raw:
                 before, found, after = raw.rpartition(marker)
                 if found:
-                    raw = before + script + found + after
+                    raw = before + scripts + found + after
             data = raw.encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -95,8 +98,8 @@ class Handler(app.Handler):
             self.end_headers()
             self.wfile.write(data)
             return
-        if path == '/delivery_patch.js':
-            data = (BASE_DIR / 'delivery_patch.js').read_bytes()
+        if path in ('/delivery_patch.js', '/ai_server_patch.js'):
+            data = (BASE_DIR / path.lstrip('/')).read_bytes()
             self.send_response(200)
             self.send_header('Content-Type', 'application/javascript; charset=utf-8')
             self.send_header('Content-Length', str(len(data)))
