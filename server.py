@@ -9,7 +9,6 @@ BASE_DIR = Path(__file__).resolve().parent
 
 
 def extract_embedded_paperwork():
-    """Read the four original paperwork records already embedded in index.html."""
     text = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
     marker = 'paperwork: ['
     start = text.find(marker)
@@ -105,7 +104,7 @@ class Handler(app.Handler):
                 '<script src="/ai_recipe_save_patch.js?v=3"></script>'
                 '<script src="/recipe_category_patch.js?v=3"></script>'
                 '<script src="/recipe_seed_patch.js?v=1"></script>'
-                '<script src="/prep_nav_repair_patch.js?v=1"></script>'
+                '<script src="/prep_nav_repair_patch.js?v=2"></script>'
             )
             if '/prep_nav_repair_patch.js' not in raw:
                 before, found, after = raw.rpartition(marker)
