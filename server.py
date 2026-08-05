@@ -104,7 +104,7 @@ class Handler(app.Handler):
                 '<script src="/menu_builder_patch.js?v=1"></script>'
                 '<script src="/menu_photo_import_patch.js?v=1"></script>'
                 '<script src="/clockin_session_patch.js?v=1"></script>'
-                '<script src="/ai_recipe_save_patch.js?v=2"></script>'
+                '<script src="/ai_recipe_save_patch.js?v=3"></script>'
             )
             if '/ai_recipe_save_patch.js' not in raw:
                 before, found, after = raw.rpartition(marker)
@@ -146,5 +146,5 @@ if __name__ == '__main__':
     restore_original_paperwork()
     startup_history.install(app)
     port = int(os.environ.get('PORT', '10000'))
-    print(f'Coach & Horses Kitchen Pro listening on 0.0.0.0:{port}')
+    print('Coach & Horses Kitchen Pro listening on 0.0.0.0:%s' % port)
     ThreadingHTTPServer(('0.0.0.0', port), Handler).serve_forever()
