@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 import app
+import startup_history
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -109,6 +110,7 @@ class Handler(app.Handler):
 
 if __name__ == '__main__':
     restore_original_paperwork()
+    startup_history.install(app)
     port = int(os.environ.get('PORT', '10000'))
     print(f'Coach & Horses Kitchen Pro listening on 0.0.0.0:{port}')
     ThreadingHTTPServer(('0.0.0.0', port), Handler).serve_forever()
