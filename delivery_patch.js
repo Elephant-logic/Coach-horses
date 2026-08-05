@@ -70,3 +70,39 @@
   }
   install();
 })();
+
+(function(){
+  function installPaperworkDelete(){
+    if(typeof state==='undefined'||typeof esc!=='function'||typeof save!=='function'||typeof audit!=='function'){
+      return setTimeout(installPaperworkDelete,150);
+    }
+    if(window.__paperworkDeleteInstalled) return;
+    window.__paperworkDeleteInstalled=true;
+
+    window.deletePaperwork=async function(id){
+      if(!window.me||me.role!=='manager') return toast('Manager access required.','bad');
+      const p=(state.paperwork||[]).find(x=>x.id===id);
+      if(!p) return toast('Document not found.','bad');
+      const ok=confirm(`Delete “${p.title||'this document'}”?\n\nThis removes the uploaded document image. Any temperature readings already imported into the digital register will remain for audit history.`);
+      if(!ok) return;
+      state.paperwork=state.paperwork.filter(x=>x.id!==id);
+      await audit('delete','paperwork',{id,title:p.title||'',deletedBy:me.name});
+      save();
+      if(typeof closeModal==='function') closeModal();
+      toast('Uploaded document deleted.','ok');
+      render();
+    };
+
+    const managerDeleteButton=p=>(window.me&&me.role==='manager')?`<button class="btn sm ghost" onclick="deletePaperwork('${p.id}')" style="color:#a33;border-color:#c99">Delete</button>`:'';
+    paperCard=function(p){
+      return `<article class="paper-card" data-search="${esc(((p.title||'')+' '+(p.type||'')+' '+(p.notes||'')+' '+(p.recordDate||'')).toLowerCase())}" data-year="${esc(String(p.recordDate||'').slice(0,4))}">
+        <img src="${p.image}" alt="${esc(p.title||'Document')}" loading="lazy" onclick="viewPaper('${p.id}')">
+        <div class="body"><h3>${esc(p.title||'Document')}</h3><div class="muted">${esc(p.recordDate||'Undated')} · ${esc(p.type||'Document')}</div>
+        <p class="muted" style="font-size:12.5px">${esc(p.notes||'')}</p>
+        <div class="btn-row"><button class="btn sm" onclick="viewPaper('${p.id}')">Open</button>
+          <button class="btn sm ghost" onclick="editPaper('${p.id}')">Edit</button>
+          <button class="btn sm ghost" onclick="aiPaper('${p.id}')">AI review</button>${managerDeleteButton(p)}</div></div></article>`;
+    };
+  }
+  installPaperworkDelete();
+})();
