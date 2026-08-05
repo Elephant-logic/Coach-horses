@@ -13,6 +13,7 @@
       .modal{width:min(760px,100%)!important;max-height:calc(100dvh - 24px)!important;overflow:auto!important;overscroll-behavior:contain}
       .delivery-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
       .delivery-grid .full{grid-column:1/-1}
+      .paperwork-delete{background:#a11d24!important;color:#fff!important;border-color:#a11d24!important;margin-left:6px}
       @media(max-width:640px){.delivery-grid{grid-template-columns:1fr}.delivery-grid .full{grid-column:auto}}
     `;
     document.head.appendChild(css);
@@ -66,43 +67,39 @@
       };
     };
 
+    window.deletePaperworkDocument=async function(id){
+      if(!me||me.role!=='manager') return toast('Manager access required.','bad');
+      state.paperwork=state.paperwork||[];
+      const item=state.paperwork.find(p=>String(p.id)===String(id));
+      if(!item) return toast('Document not found.','bad');
+      if(!confirm(`Delete ${item.title||'this uploaded document'}? This removes the image card but keeps any digital readings already recorded.`)) return;
+      state.paperwork=state.paperwork.filter(p=>String(p.id)!==String(id));
+      await audit('delete','paperwork',{id:item.id,title:item.title||'',by:me.name});
+      save();toast('Uploaded document deleted','ok');render();
+    };
+
+    function addPaperworkDeleteButtons(){
+      if(!me||me.role!=='manager'||!Array.isArray(state.paperwork)||!state.paperwork.length) return;
+      const buttons=[...document.querySelectorAll('button')].filter(b=>b.textContent.trim()==='AI review');
+      buttons.forEach((aiButton,index)=>{
+        const item=state.paperwork[index];
+        if(!item) return;
+        const actions=aiButton.parentElement;
+        if(!actions||actions.querySelector('.paperwork-delete')) return;
+        const del=document.createElement('button');
+        del.type='button';
+        del.className='btn sm paperwork-delete';
+        del.textContent='Delete';
+        del.onclick=()=>deletePaperworkDocument(item.id);
+        actions.appendChild(del);
+      });
+    }
+
+    const observer=new MutationObserver(()=>setTimeout(addPaperworkDeleteButtons,0));
+    observer.observe(document.body,{childList:true,subtree:true});
+    setTimeout(addPaperworkDeleteButtons,250);
+
     if(typeof route!=='undefined'&&route==='deliverychecks') render();
   }
   install();
-})();
-
-(function(){
-  function installPaperworkDelete(){
-    if(typeof state==='undefined'||typeof esc!=='function'||typeof save!=='function'||typeof audit!=='function'){
-      return setTimeout(installPaperworkDelete,150);
-    }
-    if(window.__paperworkDeleteInstalled) return;
-    window.__paperworkDeleteInstalled=true;
-
-    window.deletePaperwork=async function(id){
-      if(!window.me||me.role!=='manager') return toast('Manager access required.','bad');
-      const p=(state.paperwork||[]).find(x=>x.id===id);
-      if(!p) return toast('Document not found.','bad');
-      const ok=confirm(`Delete “${p.title||'this document'}”?\n\nThis removes the uploaded document image. Any temperature readings already imported into the digital register will remain for audit history.`);
-      if(!ok) return;
-      state.paperwork=state.paperwork.filter(x=>x.id!==id);
-      await audit('delete','paperwork',{id,title:p.title||'',deletedBy:me.name});
-      save();
-      if(typeof closeModal==='function') closeModal();
-      toast('Uploaded document deleted.','ok');
-      render();
-    };
-
-    const managerDeleteButton=p=>(window.me&&me.role==='manager')?`<button class="btn sm ghost" onclick="deletePaperwork('${p.id}')" style="color:#a33;border-color:#c99">Delete</button>`:'';
-    paperCard=function(p){
-      return `<article class="paper-card" data-search="${esc(((p.title||'')+' '+(p.type||'')+' '+(p.notes||'')+' '+(p.recordDate||'')).toLowerCase())}" data-year="${esc(String(p.recordDate||'').slice(0,4))}">
-        <img src="${p.image}" alt="${esc(p.title||'Document')}" loading="lazy" onclick="viewPaper('${p.id}')">
-        <div class="body"><h3>${esc(p.title||'Document')}</h3><div class="muted">${esc(p.recordDate||'Undated')} · ${esc(p.type||'Document')}</div>
-        <p class="muted" style="font-size:12.5px">${esc(p.notes||'')}</p>
-        <div class="btn-row"><button class="btn sm" onclick="viewPaper('${p.id}')">Open</button>
-          <button class="btn sm ghost" onclick="editPaper('${p.id}')">Edit</button>
-          <button class="btn sm ghost" onclick="aiPaper('${p.id}')">AI review</button>${managerDeleteButton(p)}</div></div></article>`;
-    };
-  }
-  installPaperworkDelete();
 })();
