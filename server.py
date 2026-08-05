@@ -84,8 +84,9 @@ class Handler(app.Handler):
             scripts = (
                 '<script src="/delivery_patch.js?v=7"></script>'
                 '<script src="/ai_server_patch.js?v=1"></script>'
+                '<script src="/compliance_patch.js?v=1"></script>'
             )
-            if '/ai_server_patch.js' not in raw:
+            if '/compliance_patch.js' not in raw:
                 before, found, after = raw.rpartition(marker)
                 if found:
                     raw = before + scripts + found + after
@@ -98,7 +99,7 @@ class Handler(app.Handler):
             self.end_headers()
             self.wfile.write(data)
             return
-        if path in ('/delivery_patch.js', '/ai_server_patch.js'):
+        if path in ('/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js'):
             data = (BASE_DIR / path.lstrip('/')).read_bytes()
             self.send_response(200)
             self.send_header('Content-Type', 'application/javascript; charset=utf-8')
