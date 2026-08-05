@@ -1,9 +1,77 @@
+import json
 import os
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 import app
 
 BASE_DIR = Path(__file__).resolve().parent
+
+
+def extract_embedded_paperwork():
+    """Read the four original paperwork records already embedded in index.html."""
+    text = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
+    marker = 'paperwork: ['
+    start = text.find(marker)
+    if start < 0:
+        return []
+    start = text.find('[', start)
+    depth = 0
+    in_string = False
+    escaped = False
+    quote = ''
+    for pos in range(start, len(text)):
+        char = text[pos]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == '\\':
+                escaped = True
+            elif char == quote:
+                in_string = False
+        else:
+            if char in ('"', "'"):
+                in_string = True
+                quote = char
+            elif char == '[':
+                depth += 1
+            elif char == ']':
+                depth -= 1
+                if depth == 0:
+                    return json.loads(text[start:pos + 1])
+    return []
+
+
+def restore_original_paperwork():
+    """One-time, non-destructive migration into the existing shared state."""
+    papers = extract_embedded_paperwork()
+    if not papers:
+        print('No embedded paperwork found; migration skipped')
+        return
+    with app.connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute('SELECT state, revision FROM app_state WHERE id=1 FOR UPDATE')
+            row = cur.fetchone()
+            if not row:
+                return
+            state = row['state']
+            existing = {str(item.get('id')) for item in state.get('paperwork', [])}
+            added = [item for item in papers if str(item.get('id')) not in existing]
+            if not added:
+                print('Original paperwork already present')
+                return
+            state.setdefault('paperwork', []).extend(added)
+            state.setdefault('settings', {})['originalPaperworkRestored'] = True
+            revision = int(row['revision']) + 1
+            cur.execute(
+                "UPDATE app_state SET state=%s::jsonb, revision=%s, updated_at=NOW(), updated_by='paperwork-migration' WHERE id=1",
+                (json.dumps(state, ensure_ascii=False, separators=(',', ':')), revision),
+            )
+            cur.execute(
+                "INSERT INTO server_audit(username,action,revision,details) VALUES(%s,%s,%s,%s::jsonb)",
+                ('system', 'restore_original_paperwork', revision, json.dumps({'added': len(added)})),
+            )
+        conn.commit()
+    print(f'Restored {len(added)} original paperwork records into Neon')
 
 
 class Handler(app.Handler):
@@ -13,9 +81,6 @@ class Handler(app.Handler):
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
             marker = '</body>'
             script = '<script src="/delivery_patch.js?v=4"></script>'
-            # Inject only before the final real closing body tag. The HTML contains
-            # '</body>' text inside JavaScript templates, so replacing the first
-            # occurrence corrupts the app and exposes source code on screen.
             if script not in raw:
                 before, found, after = raw.rpartition(marker)
                 if found:
@@ -43,6 +108,7 @@ class Handler(app.Handler):
 
 
 if __name__ == '__main__':
+    restore_original_paperwork()
     port = int(os.environ.get('PORT', '10000'))
     print(f'Coach & Horses Kitchen Pro listening on 0.0.0.0:{port}')
     ThreadingHTTPServer(('0.0.0.0', port), Handler).serve_forever()
