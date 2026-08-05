@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 import app
@@ -75,17 +76,35 @@ def restore_original_paperwork():
     print(f'Restored {len(added)} original paperwork records into Neon')
 
 
+def sanitize_legacy_login(raw):
+    """Remove obsolete local-login credentials and repair controls before HTML reaches the browser."""
+    # Remove complete buttons/links that expose the old local account repair feature.
+    raw = re.sub(
+        r'<(button|a)\b[^>]*>[^<]*(?:Repair all local accounts|Repair\s*/\s*reset local login)[^<]*</\1>',
+        '', raw, flags=re.IGNORECASE,
+    )
+    # Remove visible legacy account hints, including any credentials embedded in those blocks.
+    raw = re.sub(
+        r'<(p|small|div)\b[^>]*>\s*(?:Accounts:|Use [“\"]Repair all local accounts|Records are kept in this browser\.)[\s\S]{0,1200}?</\1>',
+        '', raw, flags=re.IGNORECASE,
+    )
+    # Defence in depth: redact any remaining legacy credential line before sending the page.
+    raw = re.sub(r'Accounts:\s*[^<\n]{0,1000}', 'Accounts are managed securely by the server.', raw, flags=re.IGNORECASE)
+    return raw
+
+
 class Handler(app.Handler):
     def do_GET(self):
         path = self.path.split('?', 1)[0]
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
+            raw = sanitize_legacy_login(raw)
             marker = '</body>'
             scripts = (
                 '<script src="/delivery_patch.js?v=7"></script>'
                 '<script src="/ai_server_patch.js?v=1"></script>'
                 '<script src="/compliance_patch.js?v=1"></script>'
-                '<script src="/login_cleanup_patch.js?v=1"></script>'
+                '<script src="/login_cleanup_patch.js?v=2"></script>'
                 '<script src="/recipe_menu_patch.js?v=1"></script>'
                 '<script src="/recipe_management_patch.js?v=1"></script>'
                 '<script src="/prep_delete_patch.js?v=1"></script>'
@@ -102,6 +121,8 @@ class Handler(app.Handler):
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.send_header('Content-Length', str(len(data)))
             self.send_header('Cache-Control', 'no-store, max-age=0')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.end_headers()
             self.wfile.write(data)
