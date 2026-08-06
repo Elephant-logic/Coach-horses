@@ -23,7 +23,7 @@
         let name=line.replace(/^[-*•]\s*/,'').replace(/^\d+[.)-]\s*/,'').trim();
         name=name.replace(/\*\*/g,'').replace(/^["']|["']$/g,'').trim();
         if(!name||name.length>100) continue;
-        if(/^(here are|ideas|chicken dishes|recipe ideas|you could make|option)/i.test(name)) continue;
+        if(/^(here are|ideas|recipe ideas|you could make|option)/i.test(name)) continue;
         if(name.includes(':')) name=name.split(':')[0].trim();
         if(name.split(/\s+/).length<2) continue;
         if(!ideas.some(x=>x.toLowerCase()===name.toLowerCase())) ideas.push(name);
@@ -31,45 +31,12 @@
       return ideas.slice(0,12);
     }
 
-    function promptText(input){
-      if(typeof input==='string') return input;
-      if(Array.isArray(input)){
-        return input.map(x=>{
-          if(typeof x==='string') return x;
-          if(!x) return '';
-          if(typeof x.content==='string') return x.content;
-          if(Array.isArray(x.content)) return x.content.map(p=>p&&p.text||'').join(' ');
-          return '';
-        }).join(' ');
-      }
-      return '';
-    }
-
-    function detectIdeaRequest(text){
-      const t=String(text||'').toLowerCase();
-      if(!/\b(chicken|beef|pork|fish|lamb|vegetarian|vegan)\b/.test(t)) return '';
-      if(!/\b(ideas?|dishes|dish ideas|recipe ideas)\b/.test(t)) return '';
-      if(!/\b(give|suggest|show|list|make|create)\b/.test(t)) return '';
-      const protein=(t.match(/\b(chicken|beef|pork|fish|lamb|vegetarian|vegan)\b/)||[])[1];
-      return protein||'';
-    }
-
+    // Do not rewrite AI requests. The previous version searched the entire
+    // conversation for a protein word, so an old mention of chicken could
+    // force every later dish-idea request to become chicken dishes.
     window.fetch=async function(input,init){
       const url=typeof input==='string'?input:(input&&input.url)||'';
-      let nextInit=init;
-      if(url.includes('/api/openai/responses')&&init&&typeof init.body==='string'){
-        try{
-          const payload=JSON.parse(init.body);
-          const rawPrompt=promptText(payload.input);
-          const protein=detectIdeaRequest(rawPrompt);
-          if(protein&&!/^\s*(make|save|approve)\s+(all|one|\d+)/i.test(rawPrompt)){
-            payload.input='You are the AI kitchen manager for a British pub kitchen. The user wants dish ideas, not image analysis. Do not ask for photos, images, uploads, menus, files, clarification, or more information. Return exactly 8 practical '+protein+' dish names as a numbered list. Dish names only, one per line. Do not include recipes, ingredients, explanations, headings, or markdown. Example format: 1. Dish name';
-            payload.instructions='Follow the user request directly. Never request an image or file for dish-idea questions.';
-            nextInit=Object.assign({},init,{body:JSON.stringify(payload)});
-          }
-        }catch(_){ }
-      }
-      const res=await originalFetch(input,nextInit);
+      const res=await originalFetch(input,init);
       if(url.includes('/api/openai/responses')){
         try{
           const data=await res.clone().json();
@@ -153,9 +120,9 @@
         if(/^make\s+all/i.test(text)) selected=lastDishIdeas.slice();
         else if(/^make\s+(one|one dish)$/i.test(text)) selected=[lastDishIdeas[0]];
         else {
-          const num=text.match(/^make\s+(?:number\s*)?(\d+)$/i);
-          if(num){
-            const idx=Number(num[1])-1;
+          const matchedNumber=text.match(/^make\s+(?:number\s*)?(\d+)$/i);
+          if(matchedNumber){
+            const idx=Number(matchedNumber[1])-1;
             if(idx>=0&&idx<lastDishIdeas.length) selected=[lastDishIdeas[idx]];
           } else {
             const wanted=text.replace(/^make\s+/i,'').trim().toLowerCase();
