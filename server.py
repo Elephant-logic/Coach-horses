@@ -103,7 +103,7 @@ class Handler(app.Handler):
                 '<script src="/recipe_category_patch.js?v=3"></script>'
                 '<script src="/recipe_seed_patch.js?v=1"></script>'
                 '<script src="/menu_prep_workflow_patch.js?v=1"></script>'
-                '<script src="/menu_photo_complete_import_patch.js?v=1"></script>'
+                '<script src="/menu_photo_complete_import_patch.js?v=3"></script>'
                 '<script src="/menu_recipe_selector_fix.js?v=1"></script>'
                 '<script src="/order_quantity_truth_patch.js?v=3"></script>'
                 '<script src="/recipe_viewer_patch.js?v=1"></script>'
