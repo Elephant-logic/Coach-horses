@@ -1,14 +1,15 @@
 (function(){
   function boot(){
     if(typeof state==='undefined'||typeof VIEWS==='undefined'||typeof page!=='function'||typeof save!=='function'||typeof modal!=='function') return setTimeout(boot,200);
-    if(window.__kitchenWorkflowStableV2) return;
-    window.__kitchenWorkflowStableV2=true;
+    if(window.__kitchenWorkflowStableV3) return;
+    window.__kitchenWorkflowStableV3=true;
 
-    const escv=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+    const escv=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const norm=v=>String(v||'').trim().toLowerCase();
     const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};
     const round=n=>Math.round((Number(n)||0)*100)/100;
     const staff=['Keith Davies','Ian Park','Harry Duckworth'];
+    const recipeChats={};
     const manager=()=>{try{return !!(me&&norm(me.role)==='manager');}catch(_){return false;}};
     const recipes=()=>Array.isArray(state.recipes)?state.recipes:[];
     const menus=()=>Array.isArray(state.menus)?state.menus:[];
@@ -17,32 +18,55 @@
     const recipesFor=m=>{const ids=(Array.isArray(m&&m.recipeIds)?m.recipeIds:[]).map(String);return recipes().filter(r=>ids.includes(String(r.id)));};
     const responseText=data=>{let out=data&&data.output_text||'';if(!out&&Array.isArray(data&&data.output))for(const item of data.output)for(const part of(item.content||[]))if(part.text)out+=part.text;return out;};
 
-    async function rebuildFullRecipe(id){
+    function recipeSnapshot(r){
+      return {
+        name:r.name||'Recipe',
+        category:r.category||r.course||'Other',
+        portions:Math.max(1,num(r.portions||r.yield)||10),
+        ingredients:Array.isArray(r.ingredients)?r.ingredients:[],
+        method:Array.isArray(r.method)?r.method.join('\n'):String(r.method||''),
+        allergens:r.allergens||'VERIFY'
+      };
+    }
+
+    async function generateRecipe(id,instruction){
       const r=recipeFor(id);if(!r)return;
-      const prompt='Create a complete from-scratch professional British pub kitchen recipe for '+r.name+'. Return ONLY valid JSON with keys name, category, portions, ingredients, method, allergens. Use 10 portions. ingredients must contain at least 5 objects with name, positive numeric qty and practical unit. method must be detailed numbered production steps starting with raw ingredients and covering preparation, cooking, cooling or holding where relevant, finishing and service. Do not give only plating or serving instructions. Do not assume bought-in sauces, fillings or components unless the dish name clearly requires a branded ready-made product. Include how every major component is made.';
+      const request=String(instruction||'Generate a complete from-scratch recipe').trim();
+      const prompt='You are improving a professional British pub kitchen recipe. Return ONLY valid JSON with keys name, category, portions, ingredients, method, allergens. Keep the dish name unless the user explicitly asks to rename it. Use 10 portions unless the user asks otherwise. Ingredients must be objects with name, positive numeric qty and practical unit. The method must be detailed numbered production steps from raw ingredients, including preparation, cooking, cooling or holding where relevant, sauces, fillings and major components made from scratch, then finishing and service. Never return only plating or serving instructions. Apply the user request fully.\n\nCURRENT RECIPE:\n'+JSON.stringify(recipeSnapshot(r))+'\n\nUSER REQUEST:\n'+request;
+      const chat=recipeChats[String(id)]||(recipeChats[String(id)]=[]);
+      chat.push({role:'user',text:request});
+      renderRecipeView(id,true);
       try{
-        if(typeof toast==='function')toast('Rebuilding full recipe…','ok');
         const res=await fetch('/api/openai/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'gpt-4.1-mini',input:prompt})});
         const data=await res.json();if(!res.ok)throw new Error(data?.error?.message||'AI request failed');
-        const match=responseText(data).match(/\{[\s\S]*\}/);if(!match)throw new Error('No full recipe returned');
+        const match=responseText(data).match(/\{[\s\S]*\}/);if(!match)throw new Error('No complete recipe returned');
         const obj=JSON.parse(match[0]);
         const ingredients=(Array.isArray(obj.ingredients)?obj.ingredients:[]).map(i=>({name:String(i.name||i.ingredient||'').trim(),qty:Math.max(0.01,num(i.qty??i.quantity)),unit:String(i.unit||'').trim()})).filter(i=>i.name&&i.qty>0&&i.unit);
         const method=Array.isArray(obj.method)?obj.method.join('\n'):String(obj.method||'').trim();
-        if(ingredients.length<5||method.length<120)throw new Error('The returned recipe was still incomplete');
+        if(ingredients.length<3||method.length<100)throw new Error('The returned recipe was incomplete');
         Object.assign(r,{category:obj.category||r.category,course:obj.category||r.course,portions:Math.max(1,num(obj.portions)||10),ingredients,method,allergens:Array.isArray(obj.allergens)?obj.allergens.join(', '):String(obj.allergens||'VERIFY'),needsVerification:true,quantitiesReady:true,recipeDepth:'from-scratch',updatedAt:new Date().toISOString()});
         await Promise.resolve(save());
-        if(typeof toast==='function')toast('Full recipe rebuilt','ok');
+        chat.push({role:'assistant',text:'Recipe updated and saved.'});
+        if(typeof toast==='function')toast('Recipe updated and saved','ok');
         renderRecipeView(id);
-      }catch(err){if(typeof toast==='function')toast('Recipe rebuild failed: '+err.message,'bad');}
+      }catch(err){
+        chat.push({role:'assistant',text:'Could not update it: '+err.message});
+        if(typeof toast==='function')toast('Recipe update failed: '+err.message,'bad');
+        renderRecipeView(id);
+      }
     }
 
-    function renderRecipeView(id){
+    function renderRecipeView(id,busy){
       const r=recipeFor(id);if(!r)return toast&&toast('Recipe not found','bad');
       const ingredients=(Array.isArray(r.ingredients)?r.ingredients:[]).map(i=>typeof i==='string'?'<li>'+escv(i)+'</li>':'<li>'+escv(i.qty??i.quantity??'')+' '+escv(i.unit||'')+' '+escv(i.name||'Ingredient')+'</li>').join('');
       const method=Array.isArray(r.method)?r.method.join('\n'):String(r.method||'');
-      modal('<h2>'+escv(r.name||'Recipe')+'</h2><p class="muted">'+escv(r.course||r.category||'Other')+' · '+Number(r.portions||r.yield||10)+' portions</p><h3>Ingredients</h3><ul>'+(ingredients||'<li>No ingredients entered.</li>')+'</ul><h3>Full method</h3><div style="white-space:pre-wrap">'+escv(method||'No method entered.')+'</div><h3>Allergens</h3><p>'+escv(r.allergens||'Not entered')+'</p><div class="btn-row mt"><button class="btn" id="stableEditRecipe" type="button">Edit recipe</button><button class="btn ghost" id="stableRebuildRecipe" type="button">Rebuild full recipe</button><button class="btn ghost" type="button" onclick="window.print()">Print recipe</button><button class="btn ghost" type="button" onclick="closeModal()">Close</button></div>');
+      const chat=recipeChats[String(id)]||[];
+      const messages=chat.map(m=>'<div style="padding:8px 10px;margin:6px 0;border-radius:8px;background:'+(m.role==='user'?'#f1ead5':'#f7f7f7')+'"><b>'+(m.role==='user'?'You':'AI')+':</b> '+escv(m.text)+'</div>').join('');
+      modal('<h2>'+escv(r.name||'Recipe')+'</h2><p class="muted">'+escv(r.course||r.category||'Other')+' · '+Number(r.portions||r.yield||10)+' portions</p><h3>Ingredients</h3><ul>'+(ingredients||'<li>No ingredients entered.</li>')+'</ul><h3>Full method</h3><div style="white-space:pre-wrap">'+escv(method||'No method entered.')+'</div><h3>Allergens</h3><p>'+escv(r.allergens||'Not entered')+'</p><div class="btn-row mt"><button class="btn" id="stableEditRecipe" type="button">Edit recipe</button><button class="btn ghost" id="stableGenerateRecipe" type="button" '+(busy?'disabled':'')+'>Generate recipe</button><button class="btn ghost" type="button" onclick="window.print()">Print recipe</button><button class="btn ghost" type="button" onclick="closeModal()">Close</button></div><div class="card mt" style="padding:12px"><h3>AI recipe chat</h3><p class="muted">Tell the AI what to change, for example: “make the method more detailed”, “make every sauce from scratch”, “reduce the cost”, or “make it gluten free”.</p><div id="stableRecipeChatMessages" style="max-height:220px;overflow:auto">'+(messages||'<p class="muted">No changes requested yet.</p>')+'</div><form id="stableRecipeChatForm" class="form"><label>Change this recipe<textarea id="stableRecipeChatInput" placeholder="Make this recipe better and fully from scratch" '+(busy?'disabled':'')+'></textarea></label><button class="btn" type="submit" '+(busy?'disabled':'')+'>'+(busy?'Updating…':'Send to AI and save')+'</button></form></div>');
       const edit=document.getElementById('stableEditRecipe');if(edit)edit.onclick=()=>{closeModal();if(typeof window.recipeForm==='function')window.recipeForm(r.id);else if(typeof window.openRecipe==='function')window.openRecipe(r.id);};
-      const rebuild=document.getElementById('stableRebuildRecipe');if(rebuild)rebuild.onclick=()=>rebuildFullRecipe(r.id);
+      const generate=document.getElementById('stableGenerateRecipe');if(generate)generate.onclick=()=>generateRecipe(r.id,'Generate a complete, high-quality, from-scratch recipe with proper production steps and practical quantities.');
+      const form=document.getElementById('stableRecipeChatForm');if(form)form.onsubmit=e=>{e.preventDefault();const input=document.getElementById('stableRecipeChatInput'),text=String(input&&input.value||'').trim();if(!text)return toast&&toast('Tell the AI what to change','bad');generateRecipe(r.id,text);};
+      const box=document.getElementById('stableRecipeChatMessages');if(box)box.scrollTop=box.scrollHeight;
     }
     window.viewStoredRecipe=renderRecipeView;
     window.editStoredRecipe=id=>{if(typeof window.recipeForm==='function')window.recipeForm(id);else if(typeof window.openRecipe==='function')window.openRecipe(id);};
