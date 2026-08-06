@@ -103,12 +103,12 @@ class Handler(app.Handler):
                 '<script src="/recipe_category_patch.js?v=3"></script>'
                 '<script src="/recipe_seed_patch.js?v=1"></script>'
                 '<script src="/menu_prep_workflow_patch.js?v=1"></script>'
-                '<script src="/menu_photo_complete_import_patch.js?v=3"></script>'
+                '<script src="/menu_photo_complete_import_patch.js?v=2"></script>'
                 '<script src="/menu_recipe_selector_fix.js?v=1"></script>'
-                '<script src="/order_quantity_truth_patch.js?v=3"></script>'
                 '<script src="/recipe_viewer_patch.js?v=1"></script>'
+                '<script src="/menus_recipes_prep_restore.js?v=1"></script>'
             )
-            if '/recipe_viewer_patch.js' not in raw:
+            if '/menus_recipes_prep_restore.js' not in raw:
                 before, found, after = raw.rpartition(marker)
                 if found:
                     raw = before + scripts + found + after
@@ -129,8 +129,8 @@ class Handler(app.Handler):
             '/prep_delete_patch.js', '/single_dish_cleanup_patch.js', '/clockin_session_patch.js',
             '/ai_recipe_save_patch.js', '/recipe_category_patch.js', '/recipe_seed_patch.js',
             '/menu_prep_workflow_patch.js', '/menu_photo_complete_import_patch.js',
-            '/menu_recipe_selector_fix.js', '/order_quantity_truth_patch.js',
-            '/recipe_viewer_patch.js'
+            '/menu_recipe_selector_fix.js', '/recipe_viewer_patch.js',
+            '/menus_recipes_prep_restore.js'
         )
         if path in patch_files:
             data = (BASE_DIR / path.lstrip('/')).read_bytes()
