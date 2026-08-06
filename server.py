@@ -74,7 +74,7 @@ def restore_original_paperwork():
 
 
 def harden_legacy_login(raw):
-    guard = '<style id="secure-login-guard">#resetLogin,.login-note{display:none!important}#loginForm input[name="password"]{color:transparent!important;text-shadow:none!important}</style>'
+    guard = '<style id="secure-login-guard">#resetLogin,.login-note{display:none!important}#loginForm input[name="password"]{color:transparent!important;text-shadow:none!important}[data-complete-menu-upload]{display:none!important}</style>'
     if 'secure-login-guard' not in raw:
         raw = raw.replace('</head>', guard + '</head>', 1)
     raw = raw.replace('value="ChangeMe123!" autocomplete="current-password"', 'value="" autocomplete="current-password"')
