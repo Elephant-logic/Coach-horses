@@ -96,7 +96,7 @@ class Handler(app.Handler):
                 '<script src="/login_cleanup_patch.js?v=3"></script>'
                 '<script src="/recipe_management_patch.js?v=1"></script>'
                 '<script src="/clockin_session_patch.js?v=2"></script>'
-                '<script src="/ai_recipe_save_patch.js?v=3"></script>'
+                '<script src="/ai_recipe_save_patch.js?v=4"></script>'
                 '<script src="/ai_ideas_variety_patch.js?v=1"></script>'
                 '<script src="/recipe_category_patch.js?v=3"></script>'
                 '<script src="/menu_photo_complete_import_patch.js?v=3"></script>'
