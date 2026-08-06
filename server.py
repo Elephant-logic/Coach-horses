@@ -101,8 +101,9 @@ class Handler(app.Handler):
                 '<script src="/recipe_category_patch.js?v=3"></script>'
                 '<script src="/menu_photo_complete_import_patch.js?v=3"></script>'
                 '<script src="/kitchen_workflow_stable.js?v=3"></script>'
+                '<script src="/global_kitchen_assistant.js?v=1"></script>'
             )
-            if '/kitchen_workflow_stable.js' not in raw:
+            if '/global_kitchen_assistant.js' not in raw:
                 before, found, after = raw.rpartition(marker)
                 if found:
                     raw = before + scripts + found + after
@@ -121,7 +122,8 @@ class Handler(app.Handler):
             '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
             '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
             '/ai_recipe_save_patch.js', '/ai_ideas_variety_patch.js', '/recipe_category_patch.js',
-            '/menu_photo_complete_import_patch.js', '/kitchen_workflow_stable.js'
+            '/menu_photo_complete_import_patch.js', '/kitchen_workflow_stable.js',
+            '/global_kitchen_assistant.js'
         )
         if path in patch_files:
             data = (BASE_DIR / path.lstrip('/')).read_bytes()
