@@ -1,10 +1,9 @@
 (function(){
   function boot(){
-    if(typeof state==='undefined'||typeof VIEWS==='undefined'||typeof page!=='function'||typeof modal!=='function'||typeof save!=='function') return setTimeout(boot,150);
-    if(window.__menuPhotoImportPatchV2) return;
-    window.__menuPhotoImportPatchV2=true;
+    if(typeof state==='undefined'||typeof VIEWS==='undefined'||typeof modal!=='function'||typeof save!=='function') return setTimeout(boot,150);
+    if(window.__menuPhotoImportPatchV3) return;
+    window.__menuPhotoImportPatchV3=true;
 
-    const escv=v=>typeof esc==='function'?esc(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const isManager=()=>typeof me!=='undefined'&&me&&String(me.role||'').toLowerCase()==='manager';
     const fileToDataURL=file=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});
 
@@ -12,47 +11,49 @@
       if(!isManager()) return typeof toast==='function'&&toast('Manager access required','bad');
       let selected=[];
       modal(`<h2>Import a complete menu</h2>
-        <p class="muted">Add every page: starters, mains, desserts, children’s menu, specials, front and back. You can take or choose one photo at a time and keep adding more before the AI reads them.</p>
+        <p class="muted">Photograph every page, one at a time, or select several existing photos. All pages are read together as one menu.</p>
         <form id="menuPhotoForm" class="form">
           <label>Menu name<input name="name" placeholder="Coach & Horses main menu" required></label>
-          <label>Add menu page photos<input id="menuPhotoFiles" type="file" accept="image/*" multiple></label>
+          <input id="menuCameraInput" type="file" accept="image/*" capture="environment" hidden>
+          <input id="menuGalleryInput" type="file" accept="image/*" multiple hidden>
+          <div class="btn-row">
+            <button class="btn" id="takeMenuPhoto" type="button">Take menu photo</button>
+            <button class="btn ghost" id="chooseMenuPhotos" type="button">Choose photos</button>
+          </div>
           <div class="card" style="padding:12px;background:#f7f2df"><b id="menuPhotoCount">0 pages added</b><div id="menuPhotoNames" class="muted" style="margin-top:6px"></div></div>
-          <div class="btn-row"><button class="btn ghost" id="addMoreMenuPhotos" type="button">Add more photos</button><button class="btn" id="readAllMenuPhotos" type="submit" disabled>Read all menu pages</button></div>
+          <div class="btn-row"><button class="btn ghost" id="addAnotherMenuPhoto" type="button">Take another page</button><button class="btn" id="readAllMenuPhotos" type="submit" disabled>Read all menu pages</button></div>
         </form>`);
 
-      const input=document.getElementById('menuPhotoFiles');
-      const addMore=document.getElementById('addMoreMenuPhotos');
+      const camera=document.getElementById('menuCameraInput');
+      const gallery=document.getElementById('menuGalleryInput');
       const count=document.getElementById('menuPhotoCount');
       const names=document.getElementById('menuPhotoNames');
       const read=document.getElementById('readAllMenuPhotos');
-      function refresh(){
-        count.textContent=selected.length+' page'+(selected.length===1?'':'s')+' added';
-        names.textContent=selected.map((f,i)=>(i+1)+'. '+f.name).join(' · ');
-        read.disabled=!selected.length;
-      }
-      function collect(){
-        const incoming=[...input.files];
-        for(const f of incoming){
+
+      function addFiles(files){
+        for(const f of files){
           const key=[f.name,f.size,f.lastModified].join('|');
           if(!selected.some(x=>[x.name,x.size,x.lastModified].join('|')===key)) selected.push(f);
         }
-        input.value='';
-        refresh();
+        count.textContent=selected.length+' page'+(selected.length===1?'':'s')+' added';
+        names.textContent=selected.map((f,i)=>(i+1)+'. '+(f.name||'Camera photo')).join(' · ');
+        read.disabled=!selected.length;
       }
-      input.onchange=collect;
-      addMore.onclick=()=>input.click();
-      refresh();
+      camera.onchange=()=>{addFiles([...camera.files]);camera.value='';};
+      gallery.onchange=()=>{addFiles([...gallery.files]);gallery.value='';};
+      document.getElementById('takeMenuPhoto').onclick=()=>camera.click();
+      document.getElementById('addAnotherMenuPhoto').onclick=()=>camera.click();
+      document.getElementById('chooseMenuPhotos').onclick=()=>gallery.click();
 
       document.getElementById('menuPhotoForm').onsubmit=async e=>{
         e.preventDefault();
-        collect();
         const name=String(new FormData(e.target).get('name')||'').trim();
-        if(!selected.length) return toast('Add at least one menu page','bad');
+        if(!selected.length) return toast('Take or choose at least one menu page','bad');
         try{
           read.disabled=true;
           toast('Reading '+selected.length+' menu page'+(selected.length===1?'':'s')+'…','ok');
           const images=await Promise.all(selected.map(fileToDataURL));
-          const content=[{type:'input_text',text:'Read ALL attached images as pages of ONE commercial kitchen menu. Do not stop after the first image. Combine every visible dish from every page. Return ONLY valid JSON with keys menuName, description, dishes. dishes must contain every distinct visible dish and each item must have name, category, description, price, allergens, ingredients and method. Ingredients and method may be sensible draft estimates when not printed and must be marked for chef verification. Never merge separate dishes.'}]
+          const content=[{type:'input_text',text:'Read ALL attached images as pages of ONE commercial kitchen menu. Combine every visible dish from every page. Return ONLY valid JSON with keys menuName, description, dishes. Each dish must include name, category, description, price, allergens, ingredients and method. Ingredients and method may be sensible editable draft estimates when not printed and must be marked for chef verification. Never merge separate dishes.'}]
             .concat(images.map(image_url=>({type:'input_image',image_url})));
           const res=await fetch('/api/openai/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'gpt-4.1-mini',input:[{role:'user',content}]})});
           const data=await res.json();
@@ -75,8 +76,8 @@
           }
           const menu={id:uid(),name:name||obj.menuName||'Imported menu',description:obj.description||'',recipeIds:[...new Set(recipeIds)],createdAt:typeof nowISO==='function'?nowISO():new Date().toISOString(),createdBy:me.name,source:'Menu photos',pageCount:selected.length};
           state.menus.push(menu);
-          if(typeof audit==='function') await audit('create','menu',{id:menu.id,name:menu.name,dishes:menu.recipeIds.length,pages:selected.length,source:'multi-photo import'});
-          save(); closeModal(); toast('Imported '+menu.recipeIds.length+' dishes from '+selected.length+' pages','ok');
+          if(typeof audit==='function') await audit('create','menu',{id:menu.id,name:menu.name,dishes:menu.recipeIds.length,pages:selected.length,source:'camera-multi-page import'});
+          save(); closeModal(); toast('Imported '+menu.recipeIds.length+' editable recipes from '+selected.length+' pages','ok');
           if(typeof render==='function') render();
           if(typeof openPrepLists==='function') setTimeout(openPrepLists,100);
         }catch(err){read.disabled=false;toast(err.message,'bad');}
@@ -92,7 +93,7 @@
       if(card.querySelector('[data-import-menu-photos]')) return;
       const btn=document.createElement('button');
       btn.type='button';btn.className='btn sm';btn.dataset.importMenuPhotos='1';btn.textContent='Import menu photos';btn.onclick=window.importMenuPhotos;
-      const head=card.querySelector('.card-head')||heading.parentElement;head.appendChild(btn);
+      (card.querySelector('.card-head')||heading.parentElement).appendChild(btn);
     };
   }
   boot();
