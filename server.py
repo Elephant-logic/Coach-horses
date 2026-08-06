@@ -97,6 +97,7 @@ class Handler(app.Handler):
                 '<script src="/recipe_management_patch.js?v=1"></script>'
                 '<script src="/clockin_session_patch.js?v=2"></script>'
                 '<script src="/ai_recipe_save_patch.js?v=3"></script>'
+                '<script src="/ai_ideas_variety_patch.js?v=1"></script>'
                 '<script src="/recipe_category_patch.js?v=3"></script>'
                 '<script src="/menu_photo_complete_import_patch.js?v=3"></script>'
                 '<script src="/kitchen_workflow_stable.js?v=1"></script>'
@@ -119,7 +120,7 @@ class Handler(app.Handler):
         patch_files = (
             '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
             '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
-            '/ai_recipe_save_patch.js', '/recipe_category_patch.js',
+            '/ai_recipe_save_patch.js', '/ai_ideas_variety_patch.js', '/recipe_category_patch.js',
             '/menu_photo_complete_import_patch.js', '/kitchen_workflow_stable.js'
         )
         if path in patch_files:
