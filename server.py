@@ -82,6 +82,16 @@ def harden_legacy_login(raw):
     return raw
 
 
+RUNTIME_FILES = (
+    '/runtime_loader.js',
+    '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
+    '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
+    '/ai_recipe_save_patch.js', '/ai_ideas_variety_patch.js', '/recipe_category_patch.js',
+    '/menu_photo_complete_import_patch.js', '/kitchen_workflow_stable.js',
+    '/global_kitchen_assistant_tabs.js', '/settings_pro_patch.js',
+)
+
+
 class Handler(app.Handler):
     def do_GET(self):
         path = self.path.split('?', 1)[0]
@@ -89,25 +99,11 @@ class Handler(app.Handler):
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
             raw = harden_legacy_login(raw)
             marker = '</body>'
-            scripts = (
-                '<script src="/delivery_patch.js?v=7"></script>'
-                '<script src="/ai_server_patch.js?v=1"></script>'
-                '<script src="/compliance_patch.js?v=1"></script>'
-                '<script src="/login_cleanup_patch.js?v=3"></script>'
-                '<script src="/recipe_management_patch.js?v=1"></script>'
-                '<script src="/clockin_session_patch.js?v=2"></script>'
-                '<script src="/ai_recipe_save_patch.js?v=4"></script>'
-                '<script src="/ai_ideas_variety_patch.js?v=1"></script>'
-                '<script src="/recipe_category_patch.js?v=3"></script>'
-                '<script src="/menu_photo_complete_import_patch.js?v=3"></script>'
-                '<script src="/kitchen_workflow_stable.js?v=3"></script>'
-                '<script src="/global_kitchen_assistant_tabs.js?v=1"></script>'
-                '<script src="/settings_pro_patch.js?v=1"></script>'
-            )
-            if '/global_kitchen_assistant_tabs.js' not in raw:
+            script = '<script src="/runtime_loader.js?v=20260807"></script>'
+            if '/runtime_loader.js' not in raw:
                 before, found, after = raw.rpartition(marker)
                 if found:
-                    raw = before + scripts + found + after
+                    raw = before + script + found + after
             data = raw.encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -119,14 +115,7 @@ class Handler(app.Handler):
             self.end_headers()
             self.wfile.write(data)
             return
-        patch_files = (
-            '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
-            '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
-            '/ai_recipe_save_patch.js', '/ai_ideas_variety_patch.js', '/recipe_category_patch.js',
-            '/menu_photo_complete_import_patch.js', '/kitchen_workflow_stable.js',
-            '/global_kitchen_assistant_tabs.js', '/settings_pro_patch.js'
-        )
-        if path in patch_files:
+        if path in RUNTIME_FILES:
             data = (BASE_DIR / path.lstrip('/')).read_bytes()
             self.send_response(200)
             self.send_header('Content-Type', 'application/javascript; charset=utf-8')
