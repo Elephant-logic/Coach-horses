@@ -1,8 +1,8 @@
 (function(){
   function boot(){
     if(typeof state==='undefined'||typeof save!=='function') return setTimeout(boot,150);
-    if(window.__clockinSessionPatchInstalled) return;
-    window.__clockinSessionPatchInstalled=true;
+    if(window.__clockinSessionPatchInstalledV2) return;
+    window.__clockinSessionPatchInstalledV2=true;
 
     function currentUser(){
       try{return (typeof me!=='undefined'&&me&&me.username)?me:null;}catch(_){return null;}
@@ -18,7 +18,14 @@
     async function ensureClockedIn(){
       const user=currentUser();
       if(!user) return false;
-      if(openFor(user.username)) return true;
+      const sessionKey='clockin_session_'+String(user.username||'').toLowerCase();
+      if(openFor(user.username)){
+        try{sessionStorage.setItem(sessionKey,'1');}catch(_){}
+        return true;
+      }
+      try{
+        if(sessionStorage.getItem(sessionKey)==='1') return false;
+      }catch(_){}
       const t=typeof nowISO==='function'?nowISO():new Date().toISOString();
       const d=typeof today==='function'?today():t.slice(0,10);
       const item={
@@ -35,6 +42,9 @@
       };
       entries().push(item);
       try{
+        sessionStorage.setItem(sessionKey,'1');
+      }catch(_){}
+      try{
         if(typeof audit==='function') await audit('clock_in','time_entry',{id:item.id,username:item.username,clockIn:item.clockIn,source:'secure_session'});
         await Promise.resolve(save());
       }catch(err){
@@ -46,7 +56,6 @@
 
     window.ensureCurrentUserClockedIn=ensureClockedIn;
 
-    // Secure login restores the session asynchronously, so check until the user object exists.
     let tries=0;
     const timer=setInterval(async()=>{
       tries++;
@@ -58,12 +67,6 @@
         clearInterval(timer);
       }
     },250);
-
-    // Also repair the status after navigation or a state refresh without making duplicates.
-    new MutationObserver(()=>{
-      const user=currentUser();
-      if(user&&!openFor(user.username)) ensureClockedIn();
-    }).observe(document.documentElement,{childList:true,subtree:true});
   }
   boot();
 })();
