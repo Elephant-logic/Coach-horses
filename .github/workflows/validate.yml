@@ -51,7 +51,8 @@ jobs:
               assert needle in prep, f'missing Prep V2 contract: {needle}'
           for needle in ['typeof me','document.getElementById(\'app\')','document.getElementById(\'login\')','getPrepV2Context','/api/openai/responses','applyPrepAICommand','max_output_tokens:900']:
               assert needle in ai, f'missing assistant contract: {needle}'
-          for needle in ['VIEWS.labels=labelsView','VIEWS.photos=photosView','VIEWS.probe=probeView','VIEWS.assistant=assistantView','specificLabelForm','specificPhotoForm','specificProbeForm','specificAssistantForm','input_image','/api/openai/responses']:
+          tab_contracts=['VIEWS.labels=labelsView','VIEWS.photos=photosView','VIEWS.probe=probeView','VIEWS.assistant=assistantView','specificLabelForm','specificPhotoForm','specificProbeForm','specificAssistantForm','input_image','/api/openai/responses','VIEWS.pestcontrol=pestView','pestSpecificForm','VIEWS.haccp=haccpView','haccpSpecificForm','VIEWS.cleaning=cleaningView','cleanCompleteForm','cleanScheduleForm','VIEWS.dailychecks=dailyChecksView','dailySpecificForm','VIEWS.waste=wasteView','wasteSpecificForm','VIEWS.traceability=traceabilityView','traceSpecificForm','VIEWS.incidents=incidentView','incidentSpecificForm','VIEWS.suppliers=suppliersView','supplierSpecificForm']
+          for needle in tab_contracts:
               assert needle in tabs, f'missing tab-specific form contract: {needle}'
           for needle in ['HttpOnly; Secure','SameSite=Lax','expected_revision','conflict','OPENAI_API_KEY','payload["store"] = False','MAX_STATE_BYTES']:
               assert needle in app, f'missing server contract: {needle}'
