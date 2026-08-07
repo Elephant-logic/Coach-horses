@@ -15,6 +15,7 @@
     'recipe_category_patch.js',
     'menu_photo_complete_import_patch.js',
     'kitchen_workflow_stable.js',
+    'prep_v2.js',
     'global_kitchen_assistant_tabs.js',
     'settings_pro_patch.js'
   ];
@@ -22,7 +23,7 @@
   function load(name){
     return new Promise((resolve,reject)=>{
       const script=document.createElement('script');
-      script.src='/'+name+'?runtime=20260807';
+      script.src='/'+name+'?runtime=20260807b';
       script.async=false;
       script.onload=resolve;
       script.onerror=()=>reject(new Error('Could not load '+name));
