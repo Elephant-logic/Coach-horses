@@ -19,13 +19,14 @@
     'global_kitchen_assistant_tabs.js',
     'settings_pro_patch.js',
     'tab_specific_forms.js',
-    'tab_spreadsheet_upgrade.js'
+    'tab_spreadsheet_upgrade.js',
+    'analytics_tabs_upgrade.js'
   ];
 
   function load(name){
     return new Promise((resolve,reject)=>{
       const script=document.createElement('script');
-      script.src='/'+name+'?runtime=20260807e';
+      script.src='/'+name+'?runtime=20260807f';
       script.async=false;
       script.onload=resolve;
       script.onerror=()=>reject(new Error('Could not load '+name));
