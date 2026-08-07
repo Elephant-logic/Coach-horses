@@ -27,7 +27,7 @@
   function load(name){
     return new Promise((resolve,reject)=>{
       const script=document.createElement('script');
-      script.src='/'+name+'?runtime=20260807g';
+      script.src='/'+name+'?runtime=20260807h';
       script.async=false;
       script.onload=resolve;
       script.onerror=()=>reject(new Error('Could not load '+name));
@@ -37,7 +37,19 @@
 
   async function start(){
     try{
-      for(const name of modules) await load(name);
+      let originalHome=null;
+      let originalOverview=null;
+      for(const name of modules){
+        if(name==='kitchen_dashboard.js' && typeof VIEWS!=='undefined'){
+          originalHome=typeof VIEWS.home==='function'?VIEWS.home:null;
+          originalOverview=typeof VIEWS.overview==='function'?VIEWS.overview:null;
+        }
+        await load(name);
+        if(name==='kitchen_dashboard.js' && typeof VIEWS!=='undefined'){
+          if(originalHome) VIEWS.home=originalHome;
+          if(originalOverview) VIEWS.overview=originalOverview;
+        }
+      }
       window.__coachRuntimeReady=true;
       window.dispatchEvent(new CustomEvent('coach-runtime-ready'));
     }catch(error){
