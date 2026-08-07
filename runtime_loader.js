@@ -27,7 +27,7 @@
   function load(name){
     return new Promise((resolve,reject)=>{
       const script=document.createElement('script');
-      script.src='/'+name+'?runtime=20260807h';
+      script.src='/'+name+'?runtime=20260807i';
       script.async=false;
       script.onload=resolve;
       script.onerror=()=>reject(new Error('Could not load '+name));
@@ -35,19 +35,43 @@
     });
   }
 
+  function openManagementDashboard(){
+    try{
+      route='management';
+      if(typeof renderNav==='function') renderNav();
+      if(typeof render==='function') render();
+    }catch(error){
+      console.warn('Management dashboard navigation failed',error);
+    }
+  }
+
   async function start(){
     try{
+      let originalDashboard=null;
       let originalHome=null;
       let originalOverview=null;
       for(const name of modules){
         if(name==='kitchen_dashboard.js' && typeof VIEWS!=='undefined'){
+          originalDashboard=typeof VIEWS.dashboard==='function'?VIEWS.dashboard:null;
           originalHome=typeof VIEWS.home==='function'?VIEWS.home:null;
           originalOverview=typeof VIEWS.overview==='function'?VIEWS.overview:null;
         }
         await load(name);
         if(name==='kitchen_dashboard.js' && typeof VIEWS!=='undefined'){
+          const managementDashboard=typeof VIEWS.dashboard==='function'?VIEWS.dashboard:null;
+          if(managementDashboard) VIEWS.management=managementDashboard;
+          if(originalDashboard) VIEWS.dashboard=originalDashboard;
           if(originalHome) VIEWS.home=originalHome;
           if(originalOverview) VIEWS.overview=originalOverview;
+          window.openKitchenDashboard=openManagementDashboard;
+          const retargetDashboardButton=()=>{
+            const button=document.querySelector('[data-kd-dashboard]');
+            if(!button) return;
+            button.textContent='Management';
+            button.onclick=openManagementDashboard;
+          };
+          setTimeout(retargetDashboardButton,350);
+          setTimeout(retargetDashboardButton,1300);
         }
       }
       window.__coachRuntimeReady=true;
