@@ -18,13 +18,14 @@
     'prep_v2.js',
     'global_kitchen_assistant_tabs.js',
     'settings_pro_patch.js',
-    'tab_specific_forms.js'
+    'tab_specific_forms.js',
+    'tab_spreadsheet_upgrade.js'
   ];
 
   function load(name){
     return new Promise((resolve,reject)=>{
       const script=document.createElement('script');
-      script.src='/'+name+'?runtime=20260807d';
+      script.src='/'+name+'?runtime=20260807e';
       script.async=false;
       script.onload=resolve;
       script.onerror=()=>reject(new Error('Could not load '+name));
