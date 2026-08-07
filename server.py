@@ -88,7 +88,7 @@ RUNTIME_FILES = (
     '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
     '/ai_recipe_save_patch.js', '/ai_ideas_variety_patch.js', '/recipe_category_patch.js',
     '/menu_photo_complete_import_patch.js', '/kitchen_workflow_stable.js', '/prep_v2.js',
-    '/global_kitchen_assistant_tabs.js', '/settings_pro_patch.js',
+    '/global_kitchen_assistant_tabs.js', '/settings_pro_patch.js', '/tab_specific_forms.js',
 )
 
 
@@ -99,7 +99,7 @@ class Handler(app.Handler):
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
             raw = harden_legacy_login(raw)
             marker = '</body>'
-            script = '<script src="/runtime_loader.js?v=20260807b"></script>'
+            script = '<script src="/runtime_loader.js?v=20260807c"></script>'
             if '/runtime_loader.js' not in raw:
                 before, found, after = raw.rpartition(marker)
                 if found:
