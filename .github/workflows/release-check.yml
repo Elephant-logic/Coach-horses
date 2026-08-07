@@ -34,7 +34,6 @@ jobs:
           set -e
           python - <<'PY'
           from pathlib import Path
-          import re
           loader=Path('runtime_loader.js').read_text()
           server=Path('server.py').read_text()
           required=['delivery_patch.js','ai_server_patch.js','compliance_patch.js','login_cleanup_patch.js','recipe_management_patch.js','clockin_session_patch.js','ai_recipe_save_patch.js','ai_ideas_variety_patch.js','recipe_category_patch.js','menu_photo_complete_import_patch.js','kitchen_workflow_stable.js','prep_v2.js','global_kitchen_assistant_tabs.js','settings_pro_patch.js']
@@ -61,14 +60,14 @@ jobs:
             'assignments':'data-prep-assignee',
             'completion':'data-prep-complete',
             'stock':'data-prep-stock',
-            'csv':'downloadOrderCsv',
+            'csv':'downloadCsv',
             'AI context':'getPrepV2Context',
             'AI actions':'applyPrepAICommand',
             'primary prep route':'VIEWS.prep=renderPrep',
+            'alternate prep route':'VIEWS.prepLists=renderPrep',
           }
           for name,needle in checks.items():
               assert needle in p, f'missing {name}: {needle}'
-          assert ('VIEWS.prepLists=renderPrep' in p or 'VIEWS.preplists=renderPrep' in p), 'no alternate prep route takeover'
           print('prep contract OK')
           PY
       - name: Login isolation and AI contract
@@ -78,10 +77,21 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           a=Path('global_kitchen_assistant_tabs.js').read_text()
-          assert 'loggedIn()' in a
-          assert 'loginForm' in a
-          assert 'getPrepV2Context' in a
-          assert '/api/openai/responses' in a
-          assert 'applyPrepAICommand' in a
+          for needle in ['loggedIn()','loginForm','getPrepV2Context','/api/openai/responses','applyPrepAICommand']:
+              assert needle in a, f'missing assistant contract: {needle}'
           print('assistant contract OK')
+          PY
+      - name: Security and persistence contract
+        shell: bash
+        run: |
+          set -e
+          python - <<'PY'
+          from pathlib import Path
+          app=Path('app.py').read_text()
+          assert 'HttpOnly; Secure' in app
+          assert 'SameSite=Lax' in app
+          assert 'expected_revision' in app and 'conflict' in app
+          assert 'OPENAI_API_KEY' in app and 'payload["store"] = False' in app
+          assert 'MAX_STATE_BYTES' in app
+          print('security/persistence contract OK')
           PY
