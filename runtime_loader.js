@@ -24,7 +24,7 @@
   function load(name){
     return new Promise((resolve,reject)=>{
       const script=document.createElement('script');
-      script.src='/'+name+'?runtime=20260807c';
+      script.src='/'+name+'?runtime=20260807d';
       script.async=false;
       script.onload=resolve;
       script.onerror=()=>reject(new Error('Could not load '+name));
