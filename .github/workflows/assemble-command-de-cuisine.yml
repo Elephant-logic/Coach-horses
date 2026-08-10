@@ -22,6 +22,28 @@ jobs:
         with:
           ref: command-de-cuisine-base
           fetch-depth: 0
+      - name: Verify staged chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s  %s\n' \
+            e03a7d19c260578ae6ab789dd21f808510640142 .github/cdc_chunks/part01.b64 \
+            6c8138f63779a335791b90239e514c16ff91cac2 .github/cdc_chunks/part02.b64 \
+            ac8203fd3338f86306247fc93baf3cb2f7490963 .github/cdc_chunks/part03.b64 \
+            c00b4d1b1da49c218e2f0fa4367855a9eb868fa9 .github/cdc_chunks/part04.b64 \
+            91a20376297cfb14acf020964f6de37fdc6ba984 .github/cdc_chunks/part05.b64 \
+            7b28d279bd722c84412fc81fdc0377296f531f5a .github/cdc_chunks/part06.b64 \
+            b2252cca3c3035115f28c84d803f46522b06088b .github/cdc_chunks/part07.b64 \
+            70492b470ae92f59b9ea1502dfdd29f9b9c71655 .github/cdc_chunks/part08.b64 \
+            eb074485b6e085ee7740a195e59354961bf4b6cc .github/cdc_chunks/part09.b64 \
+            4a95a95d480f6c72bbc1c8c756825ea16ac72da6 .github/cdc_chunks/part10.b64 \
+            8c38cd1be502a98265e479d13e47d791efac343d .github/cdc_chunks/part11.b64 \
+            8f7d486c343536299cde3308d7bb1b5e2b2efb12 .github/cdc_chunks/part12.b64 \
+            c2a1ca769da2dcad174c11cf04bd61f5c533d00f .github/cdc_chunks/part13.b64 | while read expected file; do
+              actual=$(git hash-object "$file")
+              echo "$file $actual"
+              test "$actual" = "$expected"
+            done
       - name: Rebuild uploaded base exactly
         shell: bash
         run: |
