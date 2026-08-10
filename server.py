@@ -4,6 +4,7 @@ from pathlib import Path
 from http.server import ThreadingHTTPServer
 import app
 import startup_history
+import auth_controls
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -83,7 +84,7 @@ def harden_legacy_login(raw):
 
 
 RUNTIME_FILES = (
-    '/command_de_cuisine_enhancements.js',
+    '/command_de_cuisine_enhancements.js', '/account_controls.js',
     '/runtime_loader.js',
     '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
     '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
@@ -99,11 +100,18 @@ class Handler(app.Handler):
         path = self.path.split('?', 1)[0]
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
-            script = '<script src="/command_de_cuisine_enhancements.js?v=20260810a"></script>'
+            scripts = (
+                '<script src="/command_de_cuisine_enhancements.js?v=20260810a"></script>'
+                '<script src="/account_controls.js?v=20260810a"></script>'
+            )
             if '/command_de_cuisine_enhancements.js' not in raw:
                 before, found, after = raw.rpartition('</body>')
                 if found:
-                    raw = before + script + found + after
+                    raw = before + scripts + found + after
+            elif '/account_controls.js' not in raw:
+                before, found, after = raw.rpartition('</body>')
+                if found:
+                    raw = before + '<script src="/account_controls.js?v=20260810a"></script>' + found + after
             data = raw.encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -114,6 +122,12 @@ class Handler(app.Handler):
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.end_headers()
             self.wfile.write(data)
+            return
+        if path == '/api/session':
+            auth_controls.send_session(self)
+            return
+        if path == '/api/export':
+            auth_controls.send_export(self)
             return
         if path in RUNTIME_FILES:
             data = (BASE_DIR / path.lstrip('/')).read_bytes()
@@ -128,6 +142,34 @@ class Handler(app.Handler):
             self.wfile.write(data)
             return
         super().do_GET()
+
+    def do_POST(self):
+        path = self.path.split('?', 1)[0]
+        if path in ('/api/login', '/api/password/change', '/api/users/manage'):
+            try:
+                payload = self.read_json()
+            except Exception as exc:
+                self.send_json({'error': str(exc)}, 400)
+                return
+            if path == '/api/login':
+                auth_controls.login(self, payload)
+            elif path == '/api/password/change':
+                auth_controls.change_password(self, payload)
+            else:
+                auth_controls.manage_user(self, payload)
+            return
+        super().do_POST()
+
+    def do_PUT(self):
+        if self.path.split('?', 1)[0] == '/api/state':
+            try:
+                payload = self.read_json()
+            except Exception as exc:
+                self.send_json({'error': str(exc)}, 400)
+                return
+            auth_controls.save_state(self, payload)
+            return
+        super().do_PUT()
 
 
 if __name__ == '__main__':
