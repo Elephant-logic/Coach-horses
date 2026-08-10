@@ -5,13 +5,17 @@ on:
     branches: [command-de-cuisine-base]
     paths:
       - '.github/cdc-decode-trigger'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/cdc-decode-trigger'
 
 permissions:
   contents: write
 
 jobs:
   assemble:
-    if: github.event.head_commit.message == 'Assemble Command de Cuisine base'
+    if: github.event_name == 'pull_request' || github.event.head_commit.message == 'Assemble Command de Cuisine base'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
