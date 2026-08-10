@@ -37,7 +37,7 @@ jobs:
             70492b470ae92f59b9ea1502dfdd29f9b9c71655 .github/cdc_chunks/part08.b64 \
             eb074485b6e085ee7740a195e59354961bf4b6cc .github/cdc_chunks/part09.b64 \
             4a95a95d480f6c72bbc1c8c756825ea16ac72da6 .github/cdc_chunks/part10.b64 \
-            8c38cd1be502a98265e479d13e47d791efac343d .github/cdc_chunks/part11.b64 \
+            a51025a858dd8a540ded02a62b669a44ed87ecf1 .github/cdc_chunks/part11.b64 \
             8f7d486c343536299cde3308d7bb1b5e2b2efb12 .github/cdc_chunks/part12.b64 \
             c2a1ca769da2dcad174c11cf04bd61f5c533d00f .github/cdc_chunks/part13.b64 | while read expected file; do
               actual=$(git hash-object "$file")
