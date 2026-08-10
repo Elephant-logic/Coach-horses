@@ -46,6 +46,8 @@ jobs:
           app=Path('app.py').read_text()
           enh=Path('command_de_cuisine_enhancements.js').read_text()
           fixes=Path('kitchen_fixes_20260810.js').read_text()
+          menu_pages=Path('multi_page_menu_import.js').read_text()
+          detailed=Path('detailed_menu_recipes.js').read_text()
           accounts=Path('account_controls.js').read_text()
           auth=Path('auth_controls.py').read_text()
 
@@ -75,6 +77,22 @@ jobs:
           ]:
               assert needle in fixes, f'missing kitchen fix contract: {needle}'
 
+          for needle in ["multiple:true", "up to 10 menu pages", "aiExtractMenu({images:photos.map(p=>p.data)})"]:
+              assert needle in menu_pages, f'missing multi-page menu import contract: {needle}'
+
+          for needle in [
+              "build a useful recipe drafts for every dish".replace('build a useful','build useful'),
+              "AI IMPORT DRAFT",
+              "prepNotes",
+              "criticalPoints",
+              "commitImportedMenu=function",
+              "retry menu import after shared-state conflict",
+              "recipesCreated",
+              "needsReview:true",
+              "Imported recipe drafts",
+          ]:
+              assert needle in detailed, f'missing detailed recipe import contract: {needle}'
+
           for needle in ["VIEWS.account=function", "Change my password", "/api/password/change", "/api/users/manage", "ME.role!=='manager'", "Reset password", "Final control"]:
               assert needle in accounts, f'missing account UI contract: {needle}'
 
@@ -84,9 +102,9 @@ jobs:
           assert 'tempTab="history";rerender();' not in html, 'temperature save must stay on the round'
           assert 'raw = harden_legacy_login(raw)' not in server, 'legacy front-end injection must stay disabled'
           assert '/runtime_loader.js' not in server.split("if path == '/':",1)[1].split('data = raw.encode',1)[0], 'runtime loader must not be injected into the new base'
-          assert '/command_de_cuisine_enhancements.js' in server, 'enhancement module must be loaded'
-          assert '/kitchen_fixes_20260810.js' in server, 'kitchen fixes must be loaded'
-          assert '/account_controls.js' in server, 'account controls must be loaded'
+          for module in ['/command_de_cuisine_enhancements.js','/kitchen_fixes_20260810.js','/multi_page_menu_import.js','/detailed_menu_recipes.js','/account_controls.js']:
+              assert module in server, f'missing runtime module: {module}'
+          assert server.index('/multi_page_menu_import.js') < server.index('/detailed_menu_recipes.js'), 'detailed recipe override must load after multi-page importer'
           assert "path == '/api/session'" in server and "auth_controls.send_session" in server
           assert "'/api/login', '/api/password/change', '/api/users/manage'" in server
           assert 'auth_controls.save_state' in server
