@@ -71,7 +71,7 @@ jobs:
               "handleCommand(text)",
               "VIEWS.history=function",
               "Historic register plus everything recorded in the current app",
-              "legacyTemperatureRows",
+              "normaliseHistoryState",
               "dailyCheckHistory",
           ]:
               assert needle in enh, f'missing enhancement contract: {needle}'
