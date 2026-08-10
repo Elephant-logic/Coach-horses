@@ -84,7 +84,7 @@ def harden_legacy_login(raw):
 
 
 RUNTIME_FILES = (
-    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/account_controls.js',
+    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/account_controls.js',
     '/runtime_loader.js',
     '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
     '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
@@ -101,9 +101,10 @@ class Handler(app.Handler):
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
             scripts = (
-                '<script src="/command_de_cuisine_enhancements.js?v=20260810b"></script>'
-                '<script src="/kitchen_fixes_20260810.js?v=20260810b"></script>'
-                '<script src="/account_controls.js?v=20260810b"></script>'
+                '<script src="/command_de_cuisine_enhancements.js?v=20260810c"></script>'
+                '<script src="/kitchen_fixes_20260810.js?v=20260810c"></script>'
+                '<script src="/multi_page_menu_import.js?v=20260810c"></script>'
+                '<script src="/account_controls.js?v=20260810c"></script>'
             )
             if '/command_de_cuisine_enhancements.js' not in raw:
                 before, found, after = raw.rpartition('</body>')
@@ -112,9 +113,11 @@ class Handler(app.Handler):
             else:
                 extras = ''
                 if '/kitchen_fixes_20260810.js' not in raw:
-                    extras += '<script src="/kitchen_fixes_20260810.js?v=20260810b"></script>'
+                    extras += '<script src="/kitchen_fixes_20260810.js?v=20260810c"></script>'
+                if '/multi_page_menu_import.js' not in raw:
+                    extras += '<script src="/multi_page_menu_import.js?v=20260810c"></script>'
                 if '/account_controls.js' not in raw:
-                    extras += '<script src="/account_controls.js?v=20260810b"></script>'
+                    extras += '<script src="/account_controls.js?v=20260810c"></script>'
                 if extras:
                     before, found, after = raw.rpartition('</body>')
                     if found:
