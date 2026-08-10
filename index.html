@@ -440,6 +440,8 @@ function migrate(s){
   const d=blankState();
   for(const k of Object.keys(d)) if(s[k]==null) s[k]=d[k];
   s.settings=s.settings||{}; s.settings.modules=s.settings.modules||{};
+  // Older server states used an array here; the UI expects a date-keyed object.
+  if(!s.dailyChecks || Array.isArray(s.dailyChecks) || typeof s.dailyChecks!=="object") s.dailyChecks={};
   // ensure new collections exist
   ["tempReadings","rota","probes","cookLogs","coolingLogs","calibrations","cleaningTasks","fitness","pestChecks","menus","waste","timeEntries","training","maintenance","fryerLogs","stockMovements","sales","events","functions","photos"].forEach(k=>{ if(!Array.isArray(s[k])) s[k]=d[k]||[]; });
   // ensure the standard equipment set exists (adds any missing by name, keeps extras)
@@ -453,10 +455,9 @@ function migrate(s){
   // order: fridges, then freezers, then cold room, then hot hold / other — numbered within group
   const rank=a=>{const n=(a.name.match(/\d+/)||[99])[0];const g=/cold\s*room/i.test(a.name)?3:a.type==="fridge"?1:a.type==="freezer"?2:a.type==="hot"?4:5;return g*100+ +n;};
   s.appliances.sort((a,b)=>rank(a)-rank(b));
-  // give every unit its own wifi sensor; keep at least one handheld probe
-  s.probes=s.probes||[];
-  s.appliances.forEach(a=>{ if(!s.probes.some(p=>p.type==="wifi"&&p.appId===a.id)) s.probes.push({id:uid("pr"),name:a.name+" sensor",type:"wifi",appId:a.id,last:null,battery:100}); });
-  if(!s.probes.some(p=>p.type==="bluetooth")) s.probes.push({id:uid("pr"),name:"Blue handheld probe",type:"bluetooth",appId:null,last:null,battery:90});
+  // Keep configured probes, but never invent connected WiFi sensors in a live kitchen.
+  s.probes=Array.isArray(s.probes)?s.probes:[];
+  if(!serverMode && !s.probes.some(p=>p.type==="bluetooth")) s.probes.push({id:uid("pr"),name:"Blue handheld probe",type:"bluetooth",appId:null,last:null,battery:90});
   // recipes get an ingredients array + prep items an assignee field
   (s.recipes||[]).forEach(r=>{ if(!Array.isArray(r.ingredients))r.ingredients=[]; });
   (s.prepLists||[]).forEach(p=>{ if(p.assignee==null)p.assignee=""; });
@@ -532,7 +533,6 @@ function blankState(){
     {id:"ap7",name:"Cold Room",type:"fridge",target:5,critical:8},{id:"ap8",name:"Hot Hold",type:"hot",target:63,critical:63}
   ];
   const probes=[{id:"pr0",name:"Blue handheld probe",type:"bluetooth",appId:null,last:null,battery:100}];
-  appliances.forEach((a,i)=>probes.push({id:"prw"+(i+1),name:a.name+" sensor",type:"wifi",appId:a.id,last:null,battery:100}));
   const checks=[
     {id:"c1",name:"Fridges & freezers on and cold",period:"open"},{id:"c2",name:"Probe sanitised before use",period:"open"},
     {id:"c3",name:"Hand-wash stocked (soap + towels)",period:"open"},{id:"c4",name:"Surfaces & boards sanitised",period:"open"},
@@ -1222,7 +1222,10 @@ function handleCommand(raw){
 }
 function dueSummary(){ const items=dueDockets().filter(d=>!d.className.includes("done")); return items.map(d=>d.querySelector(".dk-t")?.textContent||"").filter(Boolean).join(", "); }
 function markAllChecks(period){ const day=STATE.dailyChecks[todayISO()]=STATE.dailyChecks[todayISO()]||{}; STATE.checks.filter(c=>c.period===period).forEach(c=>{day[c.id]={done:true,by:ME.username,ts:nowISO()};}); audit("checks_voice",period); save("voice checks"); if(ROUTE==="checks"||ROUTE==="pass")rerender(); }
-function readAllWifi(){ let n=0; STATE.probes.filter(p=>p.type==="wifi"&&p.appId).forEach(p=>{const a=appById(p.appId);if(!a)return;const val=+((a.type==="freezer"?-19:a.type==="hot"?68:4)+(Math.random()*1.6-0.8)).toFixed(1);p.last=val;STATE.tempReadings.push({id:uid("t"),appId:a.id,value:val,ts:nowISO(),by:ME.username,source:"probe",photo:null});n++;}); save("wifi read"); if(ROUTE==="temps"||ROUTE==="pass")rerender(); renderNav(); return n; }
+function readAllWifi(){
+  if(serverMode){ toast("WiFi sensors are not connected yet — no reading was recorded","warn"); return 0; }
+  let n=0; STATE.probes.filter(p=>p.type==="wifi"&&p.appId).forEach(p=>{const a=appById(p.appId);if(!a)return;const val=+((a.type==="freezer"?-19:a.type==="hot"?68:4)+(Math.random()*1.6-0.8)).toFixed(1);p.last=val;STATE.tempReadings.push({id:uid("t"),appId:a.id,value:val,ts:nowISO(),by:ME.username,source:"probe",photo:null});n++;}); save("preview wifi read"); if(ROUTE==="temps"||ROUTE==="pass")rerender(); renderNav(); return n;
+}
 
 async function askAI(question){
   chefSay("Let me check…",false);
@@ -1251,7 +1254,7 @@ const VIEWS={};
 VIEWS.pass=function(v){
   // signature: pass rail of gauges
   const rail=el("div",{class:"rail"});
-  STATE.appliances.forEach(a=>{
+  STATE.appliances.filter(a=>a.type==="fridge"||a.type==="freezer").forEach(a=>{
     const r=latestReading(a.id); const st=r?tempStatus(a,r.value):"none";
     const cls=st==="danger"?"danger":st==="warn"?"warn":"ok";
     rail.append(el("div",{class:"gauge "+cls,html:`
@@ -1339,11 +1342,13 @@ function kpi(label,val,delta,dir,route,ic){
 // Every module reports a task: {id,label,section,route,state:'done'|'due'|'over'|'ok',detail}
 function complianceTasks(){
   const t=[]; const h=new Date().getHours(); const today=todayISO();
-  const amDone=STATE.tempReadings.some(r=>r.ts.slice(0,10)===today&&+r.ts.slice(11,13)<12);
-  const pmDone=STATE.tempReadings.some(r=>r.ts.slice(0,10)===today&&+r.ts.slice(11,13)>=12);
-  const breaches=STATE.appliances.filter(a=>{const r=latestReading(a.id);return r&&tempStatus(a,r.value)==="danger";}).length;
-  t.push({id:"temp_am",label:"Morning temperature round",route:"temps",icon:"temp",state:amDone?"done":(h>=11?"over":"due"),detail:amDone?"Logged":"All units"});
-  t.push({id:"temp_pm",label:"Evening temperature round",route:"temps",icon:"temp",state:pmDone?"done":(h>=18?"over":h>=15?"due":"ok"),detail:pmDone?"Logged":"Before close"});
+  const coldUnits=STATE.appliances.filter(a=>a.type==="fridge"||a.type==="freezer");
+  const slotCount=period=>coldUnits.filter(a=>STATE.tempReadings.some(r=>r.appId===a.id&&r.ts.slice(0,10)===today&&(period==="am"?+r.ts.slice(11,13)<12:+r.ts.slice(11,13)>=12))).length;
+  const amCount=slotCount("am"), pmCount=slotCount("pm");
+  const amDone=coldUnits.length>0&&amCount===coldUnits.length, pmDone=coldUnits.length>0&&pmCount===coldUnits.length;
+  const breaches=coldUnits.filter(a=>{const r=latestReading(a.id);return r&&tempStatus(a,r.value)==="danger";}).length;
+  t.push({id:"temp_am",label:"Morning temperature round",route:"temps",icon:"temp",state:amDone?"done":(h>=11?"over":"due"),detail:amCount+"/"+coldUnits.length+" units"});
+  t.push({id:"temp_pm",label:"Evening temperature round",route:"temps",icon:"temp",state:pmDone?"done":(h>=18?"over":h>=15?"due":"ok"),detail:pmCount+"/"+coldUnits.length+" units"});
   if(breaches)t.push({id:"temp_breach",label:breaches+" unit"+(breaches>1?"s":"")+" out of range",route:"temps",icon:"alert",state:"over",detail:"Act & record"});
   // checks
   const day=STATE.dailyChecks[today]||{};
@@ -1425,12 +1430,16 @@ function tempRound(v){
     el("span",{class:"chip",html:icon("clock")+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})})));
   const grid=el("div",{class:"grid g2"});
   const draft={};
-  STATE.appliances.forEach(a=>{
+  const period=new Date().getHours()<12?"am":"pm";
+  const today=todayISO();
+  const coldUnits=STATE.appliances.filter(a=>a.type==="fridge"||a.type==="freezer");
+  coldUnits.forEach(a=>{
     const r=latestReading(a.id);
+    const doneNow=STATE.tempReadings.some(x=>x.appId===a.id&&x.ts.slice(0,10)===today&&(period==="am"?+x.ts.slice(11,13)<12:+x.ts.slice(11,13)>=12));
     const wrap=el("div",{class:"card",style:"background:var(--bg2);padding:14px"});
     const head=el("div",{style:"display:flex;align-items:center;gap:10px;margin-bottom:10px"});
     head.innerHTML=`<div style="flex:1"><b>${esc(a.name)}</b><div class="muted" style="font-size:12px">Target ≤ ${a.target}°C · limit ${a.critical}°C · last ${r?r.value+"°C "+fmtTime(r.ts):"—"}</div></div>`;
-    const statusTag=el("span",{class:"tag dim"},"—");
+    const statusTag=el("span",{class:"tag "+(doneNow?"ok":"dim")},doneNow?"Done "+period.toUpperCase():"Due");
     head.append(statusTag);
     const line=el("div",{style:"display:flex;gap:8px"});
     const inp=el("input",{class:"inp num mono",type:"number",step:"0.1",placeholder:"°C",style:"text-align:right;font-size:18px"});
@@ -1439,23 +1448,23 @@ function tempRound(v){
       statusTag.className="tag "+(st==="ok"?"cold":st==="warn"?"warn":st==="danger"?"danger":"dim");statusTag.textContent=val==null?"—":st==="ok"?"In range":st==="warn"?"High":"BREACH";});
     line.append(inp);
     if(probe){ line.append(el("button",{class:"btn ghost icon",title:"Read "+probe.name,html:icon("probe"),onclick:()=>{
-      // WiFi probe read (simulated jitter around target for preview; real deploy fetches sensor)
-      const val=+((a.type==="freezer"?-19:a.type==="hot"?68:4)+(Math.random()*1.6-0.8)).toFixed(1);
-      inp.value=val;inp.dispatchEvent(new Event("input"));toast(probe.name+": "+val+"°C","ok");}})); }
+      if(serverMode){toast("Sensor integration not connected yet","warn");return;}
+      const val=+((a.type==="freezer"?-19:4)+(Math.random()*1.6-0.8)).toFixed(1);
+      inp.value=val;inp.dispatchEvent(new Event("input"));toast("Preview reading: "+val+"°C","ok");}})); }
     wrap.append(head,line); grid.append(wrap);
   });
   card.append(grid);
   const foot=el("div",{style:"display:flex;gap:10px;margin-top:16px;justify-content:flex-end"});
   foot.append(el("button",{class:"btn primary",html:icon("save")+"Save round",onclick:()=>{
     let n=0,breach=[];
-    STATE.appliances.forEach(a=>{const val=draft[a.id];if(val==null||val==="")return;
+    coldUnits.forEach(a=>{const val=draft[a.id];if(val==null||val==="")return;
       STATE.tempReadings.push({id:uid("t"),appId:a.id,value:+val,ts:nowISO(),by:ME.username,source:"manual",photo:null});n++;
       if(tempStatus(a,val)==="danger")breach.push(a);});
     if(!n){toast("Enter at least one reading","warn");return;}
     audit("temp_round",n+" readings");save("temp round");
     if(breach.length){ toast(breach.length+" breach logged — add corrective action","bad"); breachModal(breach); }
     else toast(n+" readings saved","ok");
-    tempTab="history";rerender();
+    tempTab="round";rerender();
   }}));
   card.append(foot); v.append(card);
 }
@@ -1507,7 +1516,7 @@ function tempProbes(v){
     const g=el("div",{class:"card",style:"background:var(--bg2)"});
     const bat=p.battery||0;
     g.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><div class="dk-ic" style="color:var(--${p.type==="wifi"?"ok":"info"})">${icon("probe")}</div>
-      <div style="flex:1"><b>${esc(p.name)}</b><div class="muted" style="font-size:12px">${p.type==="wifi"?"WiFi sensor":"Bluetooth probe"}${p.appId?" · "+esc(appById(p.appId)?.name||""):""}</div></div></div>
+      <div style="flex:1"><b>${esc(p.name)}</b><div class="muted" style="font-size:12px">${p.type==="wifi"?(serverMode?"WiFi sensor · not connected":"WiFi sensor · preview"):"Bluetooth probe"}${p.appId?" · "+esc(appById(p.appId)?.name||""):""}</div></div></div>
       <div style="display:flex;gap:16px;margin-top:12px" class="mono">
         <div><div class="muted" style="font-size:11px">LAST</div><div style="font-size:18px">${p.last!=null?p.last+"°C":"—"}</div></div>
         <div><div class="muted" style="font-size:11px">BATTERY</div><div style="font-size:18px;color:var(--${bat<25?"danger":bat<50?"warn":"ok"})">${bat}%</div></div></div>`;
@@ -1515,7 +1524,7 @@ function tempProbes(v){
     grid.append(g);
   });
   c.append(grid);
-  c.insertAdjacentHTML("beforeend",`<div class="set-note" style="margin-top:14px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--muted)">WiFi sensors report on their own; readings flow straight into the round. Bluetooth probes are read on demand from the Log round tab. Set which unit each sensor watches so its reading auto-fills.</div>`);
+  c.insertAdjacentHTML("beforeend",`<div class="set-note" style="margin-top:14px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--muted)">WiFi sensors can be assigned to a unit here, but live sensor integration is not connected yet. Until it is connected, use manual temperature entries; the app will never invent a live reading.</div>`);
   v.append(c);
 }
 function editProbe(p){
