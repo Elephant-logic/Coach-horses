@@ -83,6 +83,7 @@ def harden_legacy_login(raw):
 
 
 RUNTIME_FILES = (
+    '/command_de_cuisine_enhancements.js',
     '/runtime_loader.js',
     '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
     '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
@@ -98,6 +99,11 @@ class Handler(app.Handler):
         path = self.path.split('?', 1)[0]
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
+            script = '<script src="/command_de_cuisine_enhancements.js?v=20260810a"></script>'
+            if '/command_de_cuisine_enhancements.js' not in raw:
+                before, found, after = raw.rpartition('</body>')
+                if found:
+                    raw = before + script + found + after
             data = raw.encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
