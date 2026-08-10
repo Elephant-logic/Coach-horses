@@ -49,6 +49,7 @@ jobs:
           multi=Path('multi_page_menu_import.js').read_text()
           detailed=Path('detailed_menu_recipes.js').read_text()
           reliable=Path('reliable_menu_import.js').read_text()
+          costing=Path('recipe_costing_fix.js').read_text()
           accounts=Path('account_controls.js').read_text()
           auth=Path('auth_controls.py').read_text()
 
@@ -88,6 +89,13 @@ jobs:
           ]:
               assert needle in reliable, f'missing reliable importer contract: {needle}'
 
+          for needle in [
+              'Estimate ROUGH UK trade ingredient cost', 'estimatedLineCost', 'Food cost £ / portion',
+              'Not linked to stock', 'Estimate rough food cost', "r.cost=money(d.estimatedFoodCost)",
+              "r.price=menuPrice",
+          ]:
+              assert needle in costing, f'missing recipe costing contract: {needle}'
+
           for needle in ["VIEWS.account=function", "Change my password", "/api/password/change", "/api/users/manage", "ME.role!=='manager'", "Reset password", "Final control"]:
               assert needle in accounts, f'missing account UI contract: {needle}'
 
@@ -97,9 +105,10 @@ jobs:
           assert 'tempTab="history";rerender();' not in html, 'temperature save must stay on the round'
           assert 'raw = harden_legacy_login(raw)' not in server, 'legacy front-end injection must stay disabled'
           assert '/runtime_loader.js' not in server.split("if path == '/':",1)[1].split('data = raw.encode',1)[0], 'runtime loader must not be injected into the new base'
-          for path in ['/command_de_cuisine_enhancements.js','/kitchen_fixes_20260810.js','/multi_page_menu_import.js','/detailed_menu_recipes.js','/reliable_menu_import.js','/account_controls.js']:
+          for path in ['/command_de_cuisine_enhancements.js','/kitchen_fixes_20260810.js','/multi_page_menu_import.js','/detailed_menu_recipes.js','/reliable_menu_import.js','/recipe_costing_fix.js','/account_controls.js']:
               assert path in server, f'{path} must be loaded'
-          assert server.index('/reliable_menu_import.js?v=20260810e') > server.index('/detailed_menu_recipes.js?v=20260810e'), 'reliable importer must load after detailed recipe override'
+          assert server.index('/reliable_menu_import.js?v=20260810f') > server.index('/detailed_menu_recipes.js?v=20260810f'), 'reliable importer must load after detailed recipe override'
+          assert server.index('/recipe_costing_fix.js?v=20260810f') > server.index('/reliable_menu_import.js?v=20260810f'), 'costing fix must load after reliable importer'
           assert "path == '/api/session'" in server and "auth_controls.send_session" in server
           assert "'/api/login', '/api/password/change', '/api/users/manage'" in server
           assert 'auth_controls.save_state' in server
