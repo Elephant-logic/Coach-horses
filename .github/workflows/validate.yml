@@ -45,6 +45,7 @@ jobs:
           server=Path('server.py').read_text()
           app=Path('app.py').read_text()
           enh=Path('command_de_cuisine_enhancements.js').read_text()
+          fixes=Path('kitchen_fixes_20260810.js').read_text()
           accounts=Path('account_controls.js').read_text()
           auth=Path('auth_controls.py').read_text()
 
@@ -63,6 +64,17 @@ jobs:
           for needle in ["chefNav.label='Chef AI'", "placeholder:'Ask Chef anything, or type a command…'", "handleCommand(text)", "VIEWS.history=function", "Historic register plus everything recorded in the current app", "normaliseHistoryState", "dailyCheckHistory"]:
               assert needle in enh, f'missing enhancement contract: {needle}'
 
+          for needle in [
+              "weekCompliance=function()",
+              "Fill missed temperature round",
+              "source:'manager-backfill'",
+              "Temperature record coverage — last 7 days",
+              "accept:'image/*,.jpg,.jpeg,.png,.webp,.heic,.heif'",
+              "Never say records are complete when the context says readings/checks are missing",
+              "Missing temperature rounds:",
+          ]:
+              assert needle in fixes, f'missing kitchen fix contract: {needle}'
+
           for needle in ["VIEWS.account=function", "Change my password", "/api/password/change", "/api/users/manage", "ME.role!=='manager'", "Reset password", "Final control"]:
               assert needle in accounts, f'missing account UI contract: {needle}'
 
@@ -73,6 +85,7 @@ jobs:
           assert 'raw = harden_legacy_login(raw)' not in server, 'legacy front-end injection must stay disabled'
           assert '/runtime_loader.js' not in server.split("if path == '/':",1)[1].split('data = raw.encode',1)[0], 'runtime loader must not be injected into the new base'
           assert '/command_de_cuisine_enhancements.js' in server, 'enhancement module must be loaded'
+          assert '/kitchen_fixes_20260810.js' in server, 'kitchen fixes must be loaded'
           assert '/account_controls.js' in server, 'account controls must be loaded'
           assert "path == '/api/session'" in server and "auth_controls.send_session" in server
           assert "'/api/login', '/api/password/change', '/api/users/manage'" in server
