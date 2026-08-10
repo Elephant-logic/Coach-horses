@@ -25,36 +25,51 @@ jobs:
       - name: JavaScript syntax
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           for f in *.js; do node --check "$f"; done
-      - name: Runtime and feature contracts
+          python - <<'PY' > /tmp/command-de-cuisine.js
+          from pathlib import Path
+          s=Path('index.html').read_text()
+          a=s.index('<script>')+len('<script>')
+          b=s.rindex('</script>')
+          print(s[a:b])
+          PY
+          node --check /tmp/command-de-cuisine.js
+      - name: Command de Cuisine contracts
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          loader=Path('runtime_loader.js').read_text()
+          html=Path('index.html').read_text()
           server=Path('server.py').read_text()
-          prep=Path('prep_v2.js').read_text()
-          ai=Path('global_kitchen_assistant_tabs.js').read_text()
-          tabs=Path('tab_specific_forms.js').read_text()
           app=Path('app.py').read_text()
-          required=['delivery_patch.js','ai_server_patch.js','compliance_patch.js','login_cleanup_patch.js','recipe_management_patch.js','clockin_session_patch.js','ai_recipe_save_patch.js','ai_ideas_variety_patch.js','recipe_category_patch.js','menu_photo_complete_import_patch.js','kitchen_workflow_stable.js','prep_v2.js','global_kitchen_assistant_tabs.js','settings_pro_patch.js','tab_specific_forms.js']
-          for f in required:
-              assert Path(f).exists(), f'missing {f}'
-              assert f in loader, f'{f} not loaded'
-              assert ('/'+f) in server, f'{f} not served'
-          assert loader.index('prep_v2.js') < loader.index('global_kitchen_assistant_tabs.js')
-          assert loader.index('settings_pro_patch.js') < loader.index('tab_specific_forms.js')
+
+          for needle in [
+              'Command de Cuisine — The Coach &amp; Horses',
+              'VIEWS.pass=function',
+              'VIEWS.temps=function',
+              'VIEWS.checks=function',
+              'VIEWS.prep=function',
+              'VIEWS.cooking=function',
+              'VIEWS.cleaning=function',
+              'VIEWS.stock=function',
+              'VIEWS.reports=function',
+              'Array.isArray(s.dailyChecks)',
+              'amCount+"/"+coldUnits.length+" units"',
+              'pmCount+"/"+coldUnits.length+" units"',
+              'tempTab="round";rerender();',
+              'WiFi sensors are not connected yet — no reading was recorded',
+              'the app will never invent a live reading',
+          ]:
+              assert needle in html, f'missing Command de Cuisine contract: {needle}'
+
+          assert 'tempTab="history";rerender();' not in html, 'temperature save must stay on the round'
+          assert 'raw = harden_legacy_login(raw)' not in server, 'legacy front-end injection must stay disabled'
+          assert '/runtime_loader.js' not in server.split("if path == '/':",1)[1].split('return',1)[0], 'runtime loader must not be injected into the new base'
           assert 'python server.py' in Path('render.yaml').read_text()
-          for needle in ['state.prepLists','prepV2Date','prepV2Covers','data-prep-assignee','data-prep-complete','data-prep-stock','downloadCsv','getPrepV2Context','applyPrepAICommand','VIEWS.prep=renderPrep','VIEWS.prepLists=renderPrep']:
-              assert needle in prep, f'missing Prep V2 contract: {needle}'
-          for needle in ['typeof me','document.getElementById(\'app\')','document.getElementById(\'login\')','getPrepV2Context','/api/openai/responses','applyPrepAICommand','max_output_tokens:900']:
-              assert needle in ai, f'missing assistant contract: {needle}'
-          tab_contracts=['VIEWS.labels=labelsView','VIEWS.photos=photosView','VIEWS.probe=probeView','VIEWS.assistant=assistantView','specificLabelForm','specificPhotoForm','specificProbeForm','specificAssistantForm','input_image','/api/openai/responses','VIEWS.pestcontrol=pestView','pestSpecificForm','VIEWS.haccp=haccpView','haccpSpecificForm','VIEWS.cleaning=cleaningView','cleanCompleteForm','cleanScheduleForm','VIEWS.dailychecks=dailyChecksView','dailySpecificForm','VIEWS.waste=wasteView','wasteSpecificForm','VIEWS.traceability=traceabilityView','traceSpecificForm','VIEWS.incidents=incidentView','incidentSpecificForm','VIEWS.suppliers=suppliersView','supplierSpecificForm']
-          for needle in tab_contracts:
-              assert needle in tabs, f'missing tab-specific form contract: {needle}'
+
           for needle in ['HttpOnly; Secure','SameSite=Lax','expected_revision','conflict','OPENAI_API_KEY','payload["store"] = False','MAX_STATE_BYTES']:
               assert needle in app, f'missing server contract: {needle}'
-          print('Kitchen app validation OK')
+          print('Command de Cuisine validation OK')
           PY
