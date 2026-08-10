@@ -98,13 +98,6 @@ class Handler(app.Handler):
         path = self.path.split('?', 1)[0]
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
-            raw = harden_legacy_login(raw)
-            marker = '</body>'
-            script = '<script src="/runtime_loader.js?v=20260807g"></script>'
-            if '/runtime_loader.js' not in raw:
-                before, found, after = raw.rpartition(marker)
-                if found:
-                    raw = before + script + found + after
             data = raw.encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
