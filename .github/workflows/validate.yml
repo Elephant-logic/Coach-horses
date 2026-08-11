@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: '22'
       - name: Python syntax
-        run: python -m py_compile app.py server.py startup_history.py auth_controls.py
+        run: python -m py_compile app.py server.py startup_history.py auth_controls.py logout_control.py
       - name: JavaScript syntax
         shell: bash
         run: |
@@ -51,6 +51,8 @@ jobs:
           reliable=Path('reliable_menu_import.js').read_text()
           costing=Path('recipe_costing_fix.js').read_text()
           accounts=Path('account_controls.js').read_text()
+          logout_ui=Path('logout_controls.js').read_text()
+          logout_server=Path('logout_control.py').read_text()
           auth=Path('auth_controls.py').read_text()
 
           for needle in [
@@ -99,17 +101,24 @@ jobs:
           for needle in ["VIEWS.account=function", "Change my password", "/api/password/change", "/api/users/manage", "ME.role!=='manager'", "Reset password", "Final control"]:
               assert needle in accounts, f'missing account UI contract: {needle}'
 
+          for needle in ["Log out", "/api/logout", "window.location.replace('/')", "stays signed in for up to 12 hours"]:
+              assert needle in logout_ui, f'missing logout UI contract: {needle}'
+          for needle in ["Max-Age=0", "Expires=Thu, 01 Jan 1970 00:00:00 GMT", "authenticated\": False"]:
+              assert needle in logout_server, f'missing logout server contract: {needle}'
+
           for needle in ["user.pop(\"password\", None)", "def change_password", "def manage_user", "Manager access required.", "There must always be at least one active manager.", "incoming[\"users\"] = current[\"state\"].get(\"users\", [])", "incoming[\"settings\"] = current[\"state\"].get(\"settings\", {})"]:
               assert needle in auth, f'missing auth control: {needle}'
 
           assert 'tempTab="history";rerender();' not in html, 'temperature save must stay on the round'
           assert 'raw = harden_legacy_login(raw)' not in server, 'legacy front-end injection must stay disabled'
           assert '/runtime_loader.js' not in server.split("if path == '/':",1)[1].split('data = raw.encode',1)[0], 'runtime loader must not be injected into the new base'
-          for path in ['/command_de_cuisine_enhancements.js','/kitchen_fixes_20260810.js','/multi_page_menu_import.js','/detailed_menu_recipes.js','/reliable_menu_import.js','/recipe_costing_fix.js','/account_controls.js']:
+          for path in ['/command_de_cuisine_enhancements.js','/kitchen_fixes_20260810.js','/multi_page_menu_import.js','/detailed_menu_recipes.js','/reliable_menu_import.js','/recipe_costing_fix.js','/account_controls.js','/logout_controls.js']:
               assert path in server, f'{path} must be loaded'
-          assert server.index('/reliable_menu_import.js?v=20260810f') > server.index('/detailed_menu_recipes.js?v=20260810f'), 'reliable importer must load after detailed recipe override'
-          assert server.index('/recipe_costing_fix.js?v=20260810f') > server.index('/reliable_menu_import.js?v=20260810f'), 'costing fix must load after reliable importer'
+          assert server.index('/reliable_menu_import.js?v=20260811a') > server.index('/detailed_menu_recipes.js?v=20260811a'), 'reliable importer must load after detailed recipe override'
+          assert server.index('/recipe_costing_fix.js?v=20260811a') > server.index('/reliable_menu_import.js?v=20260811a'), 'costing fix must load after reliable importer'
+          assert server.index('/logout_controls.js?v=20260811a') > server.index('/account_controls.js?v=20260811a'), 'logout UI must load after account controls'
           assert "path == '/api/session'" in server and "auth_controls.send_session" in server
+          assert "path == '/api/logout'" in server and 'logout_control.logout(self)' in server
           assert "'/api/login', '/api/password/change', '/api/users/manage'" in server
           assert 'auth_controls.save_state' in server
           assert 'python server.py' in Path('render.yaml').read_text()

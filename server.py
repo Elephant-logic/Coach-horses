@@ -5,6 +5,7 @@ from http.server import ThreadingHTTPServer
 import app
 import startup_history
 import auth_controls
+import logout_control
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -84,7 +85,7 @@ def harden_legacy_login(raw):
 
 
 RUNTIME_FILES = (
-    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/detailed_menu_recipes.js', '/reliable_menu_import.js', '/recipe_costing_fix.js', '/account_controls.js',
+    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/detailed_menu_recipes.js', '/reliable_menu_import.js', '/recipe_costing_fix.js', '/account_controls.js', '/logout_controls.js',
     '/runtime_loader.js',
     '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
     '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
@@ -101,13 +102,14 @@ class Handler(app.Handler):
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
             scripts = (
-                '<script src="/command_de_cuisine_enhancements.js?v=20260810f"></script>'
-                '<script src="/kitchen_fixes_20260810.js?v=20260810f"></script>'
-                '<script src="/multi_page_menu_import.js?v=20260810f"></script>'
-                '<script src="/detailed_menu_recipes.js?v=20260810f"></script>'
-                '<script src="/reliable_menu_import.js?v=20260810f"></script>'
-                '<script src="/recipe_costing_fix.js?v=20260810f"></script>'
-                '<script src="/account_controls.js?v=20260810f"></script>'
+                '<script src="/command_de_cuisine_enhancements.js?v=20260811a"></script>'
+                '<script src="/kitchen_fixes_20260810.js?v=20260811a"></script>'
+                '<script src="/multi_page_menu_import.js?v=20260811a"></script>'
+                '<script src="/detailed_menu_recipes.js?v=20260811a"></script>'
+                '<script src="/reliable_menu_import.js?v=20260811a"></script>'
+                '<script src="/recipe_costing_fix.js?v=20260811a"></script>'
+                '<script src="/account_controls.js?v=20260811a"></script>'
+                '<script src="/logout_controls.js?v=20260811a"></script>'
             )
             if '/command_de_cuisine_enhancements.js' not in raw:
                 before, found, after = raw.rpartition('</body>')
@@ -116,17 +118,19 @@ class Handler(app.Handler):
             else:
                 extras = ''
                 if '/kitchen_fixes_20260810.js' not in raw:
-                    extras += '<script src="/kitchen_fixes_20260810.js?v=20260810f"></script>'
+                    extras += '<script src="/kitchen_fixes_20260810.js?v=20260811a"></script>'
                 if '/multi_page_menu_import.js' not in raw:
-                    extras += '<script src="/multi_page_menu_import.js?v=20260810f"></script>'
+                    extras += '<script src="/multi_page_menu_import.js?v=20260811a"></script>'
                 if '/detailed_menu_recipes.js' not in raw:
-                    extras += '<script src="/detailed_menu_recipes.js?v=20260810f"></script>'
+                    extras += '<script src="/detailed_menu_recipes.js?v=20260811a"></script>'
                 if '/reliable_menu_import.js' not in raw:
-                    extras += '<script src="/reliable_menu_import.js?v=20260810f"></script>'
+                    extras += '<script src="/reliable_menu_import.js?v=20260811a"></script>'
                 if '/recipe_costing_fix.js' not in raw:
-                    extras += '<script src="/recipe_costing_fix.js?v=20260810f"></script>'
+                    extras += '<script src="/recipe_costing_fix.js?v=20260811a"></script>'
                 if '/account_controls.js' not in raw:
-                    extras += '<script src="/account_controls.js?v=20260810f"></script>'
+                    extras += '<script src="/account_controls.js?v=20260811a"></script>'
+                if '/logout_controls.js' not in raw:
+                    extras += '<script src="/logout_controls.js?v=20260811a"></script>'
                 if extras:
                     before, found, after = raw.rpartition('</body>')
                     if found:
@@ -164,6 +168,9 @@ class Handler(app.Handler):
 
     def do_POST(self):
         path = self.path.split('?', 1)[0]
+        if path == '/api/logout':
+            logout_control.logout(self)
+            return
         if path in ('/api/login', '/api/password/change', '/api/users/manage'):
             try:
                 payload = self.read_json()
