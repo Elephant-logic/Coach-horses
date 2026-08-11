@@ -85,7 +85,7 @@ def harden_legacy_login(raw):
 
 
 RUNTIME_FILES = (
-    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/detailed_menu_recipes.js', '/reliable_menu_import.js', '/recipe_costing_fix.js', '/account_controls.js', '/logout_controls.js',
+    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/detailed_menu_recipes.js', '/reliable_menu_import.js', '/recipe_costing_fix.js', '/account_controls.js', '/logout_controls.js', '/manager_ai_temp_backfill.js',
     '/runtime_loader.js',
     '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
     '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
@@ -110,6 +110,7 @@ class Handler(app.Handler):
                 '<script src="/recipe_costing_fix.js?v=20260811a"></script>'
                 '<script src="/account_controls.js?v=20260811a"></script>'
                 '<script src="/logout_controls.js?v=20260811a"></script>'
+                '<script src="/manager_ai_temp_backfill.js?v=20260811a"></script>'
             )
             if '/command_de_cuisine_enhancements.js' not in raw:
                 before, found, after = raw.rpartition('</body>')
@@ -131,6 +132,8 @@ class Handler(app.Handler):
                     extras += '<script src="/account_controls.js?v=20260811a"></script>'
                 if '/logout_controls.js' not in raw:
                     extras += '<script src="/logout_controls.js?v=20260811a"></script>'
+                if '/manager_ai_temp_backfill.js' not in raw:
+                    extras += '<script src="/manager_ai_temp_backfill.js?v=20260811a"></script>'
                 if extras:
                     before, found, after = raw.rpartition('</body>')
                     if found:
