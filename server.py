@@ -102,15 +102,15 @@ class Handler(app.Handler):
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
             scripts = (
-                '<script src="/command_de_cuisine_enhancements.js?v=20260811b"></script>'
-                '<script src="/kitchen_fixes_20260810.js?v=20260811b"></script>'
-                '<script src="/multi_page_menu_import.js?v=20260811b"></script>'
-                '<script src="/detailed_menu_recipes.js?v=20260811b"></script>'
-                '<script src="/reliable_menu_import.js?v=20260811b"></script>'
-                '<script src="/recipe_costing_fix.js?v=20260811b"></script>'
-                '<script src="/account_controls.js?v=20260811b"></script>'
-                '<script src="/logout_controls.js?v=20260811b"></script>'
-                '<script src="/manager_ai_temp_backfill.js?v=20260811b"></script>'
+                '<script src="/command_de_cuisine_enhancements.js?v=20260811a"></script>'
+                '<script src="/kitchen_fixes_20260810.js?v=20260811a"></script>'
+                '<script src="/multi_page_menu_import.js?v=20260811a"></script>'
+                '<script src="/detailed_menu_recipes.js?v=20260811a"></script>'
+                '<script src="/reliable_menu_import.js?v=20260811a"></script>'
+                '<script src="/recipe_costing_fix.js?v=20260811a"></script>'
+                '<script src="/account_controls.js?v=20260811a"></script>'
+                '<script src="/logout_controls.js?v=20260811a"></script>'
+                '<script src="/manager_ai_temp_backfill.js?v=20260811a"></script>'
             )
             if '/command_de_cuisine_enhancements.js' not in raw:
                 before, found, after = raw.rpartition('</body>')
@@ -119,21 +119,21 @@ class Handler(app.Handler):
             else:
                 extras = ''
                 if '/kitchen_fixes_20260810.js' not in raw:
-                    extras += '<script src="/kitchen_fixes_20260810.js?v=20260811b"></script>'
+                    extras += '<script src="/kitchen_fixes_20260810.js?v=20260811a"></script>'
                 if '/multi_page_menu_import.js' not in raw:
-                    extras += '<script src="/multi_page_menu_import.js?v=20260811b"></script>'
+                    extras += '<script src="/multi_page_menu_import.js?v=20260811a"></script>'
                 if '/detailed_menu_recipes.js' not in raw:
-                    extras += '<script src="/detailed_menu_recipes.js?v=20260811b"></script>'
+                    extras += '<script src="/detailed_menu_recipes.js?v=20260811a"></script>'
                 if '/reliable_menu_import.js' not in raw:
-                    extras += '<script src="/reliable_menu_import.js?v=20260811b"></script>'
+                    extras += '<script src="/reliable_menu_import.js?v=20260811a"></script>'
                 if '/recipe_costing_fix.js' not in raw:
-                    extras += '<script src="/recipe_costing_fix.js?v=20260811b"></script>'
+                    extras += '<script src="/recipe_costing_fix.js?v=20260811a"></script>'
                 if '/account_controls.js' not in raw:
-                    extras += '<script src="/account_controls.js?v=20260811b"></script>'
+                    extras += '<script src="/account_controls.js?v=20260811a"></script>'
                 if '/logout_controls.js' not in raw:
-                    extras += '<script src="/logout_controls.js?v=20260811b"></script>'
+                    extras += '<script src="/logout_controls.js?v=20260811a"></script>'
                 if '/manager_ai_temp_backfill.js' not in raw:
-                    extras += '<script src="/manager_ai_temp_backfill.js?v=20260811b"></script>'
+                    extras += '<script src="/manager_ai_temp_backfill.js?v=20260811a"></script>'
                 if extras:
                     before, found, after = raw.rpartition('</body>')
                     if found:
