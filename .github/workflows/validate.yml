@@ -49,6 +49,7 @@ jobs:
           multi=Path('multi_page_menu_import.js').read_text()
           detailed=Path('detailed_menu_recipes.js').read_text()
           reliable=Path('reliable_menu_import.js').read_text()
+          quality=Path('recipe_quality_upgrade.js').read_text()
           costing=Path('recipe_costing_fix.js').read_text()
           accounts=Path('account_controls.js').read_text()
           logout_ui=Path('logout_controls.js').read_text()
@@ -92,6 +93,14 @@ jobs:
               assert needle in reliable, f'missing reliable importer contract: {needle}'
 
           for needle in [
+              'FULL start-to-finish commercial kitchen recipe specifications',
+              'Use printed menu headings and physical placement as the strongest evidence',
+              '8–16 clear numbered actionable steps', 'Improve imported recipe drafts',
+              "recipeQuality:'full-draft'", 'reclassifyExisting',
+          ]:
+              assert needle in quality, f'missing recipe quality contract: {needle}'
+
+          for needle in [
               'Estimate ROUGH UK trade ingredient cost', 'estimatedLineCost', 'Food cost £ / portion',
               'Not linked to stock', 'Estimate rough food cost', "r.cost=money(d.estimatedFoodCost)",
               "r.price=menuPrice",
@@ -112,11 +121,12 @@ jobs:
           assert 'tempTab="history";rerender();' not in html, 'temperature save must stay on the round'
           assert 'raw = harden_legacy_login(raw)' not in server, 'legacy front-end injection must stay disabled'
           assert '/runtime_loader.js' not in server.split("if path == '/':",1)[1].split('data = raw.encode',1)[0], 'runtime loader must not be injected into the new base'
-          for path in ['/command_de_cuisine_enhancements.js','/kitchen_fixes_20260810.js','/multi_page_menu_import.js','/detailed_menu_recipes.js','/reliable_menu_import.js','/recipe_costing_fix.js','/account_controls.js','/logout_controls.js']:
+          for path in ['/command_de_cuisine_enhancements.js','/kitchen_fixes_20260810.js','/multi_page_menu_import.js','/detailed_menu_recipes.js','/reliable_menu_import.js','/recipe_quality_upgrade.js','/recipe_costing_fix.js','/account_controls.js','/logout_controls.js']:
               assert path in server, f'{path} must be loaded'
-          assert server.index('/reliable_menu_import.js?v=20260811a') > server.index('/detailed_menu_recipes.js?v=20260811a'), 'reliable importer must load after detailed recipe override'
-          assert server.index('/recipe_costing_fix.js?v=20260811a') > server.index('/reliable_menu_import.js?v=20260811a'), 'costing fix must load after reliable importer'
-          assert server.index('/logout_controls.js?v=20260811a') > server.index('/account_controls.js?v=20260811a'), 'logout UI must load after account controls'
+          assert server.index('/reliable_menu_import.js?v=20260812a') > server.index('/detailed_menu_recipes.js?v=20260812a'), 'reliable importer must load after detailed recipe override'
+          assert server.index('/recipe_quality_upgrade.js?v=20260812a') > server.index('/reliable_menu_import.js?v=20260812a'), 'recipe quality must load after reliable importer'
+          assert server.index('/recipe_costing_fix.js?v=20260812a') > server.index('/recipe_quality_upgrade.js?v=20260812a'), 'costing fix must load after quality upgrade'
+          assert server.index('/logout_controls.js?v=20260812a') > server.index('/account_controls.js?v=20260812a'), 'logout UI must load after account controls'
           assert "path == '/api/session'" in server and "auth_controls.send_session" in server
           assert "path == '/api/logout'" in server and 'logout_control.logout(self)' in server
           assert "'/api/login', '/api/password/change', '/api/users/manage'" in server
