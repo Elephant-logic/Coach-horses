@@ -85,7 +85,7 @@ def harden_legacy_login(raw):
 
 
 RUNTIME_FILES = (
-    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/detailed_menu_recipes.js', '/reliable_menu_import.js', '/menu_import_stability.js', '/recipe_quality_upgrade.js', '/recipe_costing_fix.js', '/account_controls.js', '/logout_controls.js', '/manager_ai_temp_backfill.js', '/assistant_tts_fix.js',
+    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/detailed_menu_recipes.js', '/reliable_menu_import.js', '/recipe_quality_upgrade.js', '/recipe_costing_fix.js', '/account_controls.js', '/logout_controls.js', '/manager_ai_temp_backfill.js', '/core_workflow_stability.js',
     '/runtime_loader.js',
     '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
     '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
@@ -102,18 +102,17 @@ class Handler(app.Handler):
         if path == '/':
             raw = (BASE_DIR / 'index.html').read_text(encoding='utf-8')
             scripts = (
-                '<script src="/command_de_cuisine_enhancements.js?v=20260812b"></script>'
-                '<script src="/kitchen_fixes_20260810.js?v=20260812b"></script>'
-                '<script src="/multi_page_menu_import.js?v=20260812b"></script>'
-                '<script src="/detailed_menu_recipes.js?v=20260812b"></script>'
-                '<script src="/reliable_menu_import.js?v=20260812b"></script>'
-                '<script src="/menu_import_stability.js?v=20260812b"></script>'
-                '<script src="/recipe_quality_upgrade.js?v=20260812b"></script>'
-                '<script src="/recipe_costing_fix.js?v=20260812b"></script>'
-                '<script src="/account_controls.js?v=20260812b"></script>'
-                '<script src="/logout_controls.js?v=20260812b"></script>'
-                '<script src="/manager_ai_temp_backfill.js?v=20260812b"></script>'
-                '<script src="/assistant_tts_fix.js?v=20260812b"></script>'
+                '<script src="/command_de_cuisine_enhancements.js?v=20260812c"></script>'
+                '<script src="/kitchen_fixes_20260810.js?v=20260812c"></script>'
+                '<script src="/multi_page_menu_import.js?v=20260812c"></script>'
+                '<script src="/detailed_menu_recipes.js?v=20260812c"></script>'
+                '<script src="/reliable_menu_import.js?v=20260812c"></script>'
+                '<script src="/recipe_quality_upgrade.js?v=20260812c"></script>'
+                '<script src="/recipe_costing_fix.js?v=20260812c"></script>'
+                '<script src="/account_controls.js?v=20260812c"></script>'
+                '<script src="/logout_controls.js?v=20260812c"></script>'
+                '<script src="/manager_ai_temp_backfill.js?v=20260812c"></script>'
+                '<script src="/core_workflow_stability.js?v=20260812c"></script>'
             )
             if '/command_de_cuisine_enhancements.js' not in raw:
                 before, found, after = raw.rpartition('</body>')
@@ -122,10 +121,10 @@ class Handler(app.Handler):
             else:
                 extras = ''
                 for script in (
-                    'kitchen_fixes_20260810.js','multi_page_menu_import.js','detailed_menu_recipes.js','reliable_menu_import.js','menu_import_stability.js','recipe_quality_upgrade.js','recipe_costing_fix.js','account_controls.js','logout_controls.js','manager_ai_temp_backfill.js','assistant_tts_fix.js'
+                    'kitchen_fixes_20260810.js','multi_page_menu_import.js','detailed_menu_recipes.js','reliable_menu_import.js','recipe_quality_upgrade.js','recipe_costing_fix.js','account_controls.js','logout_controls.js','manager_ai_temp_backfill.js','core_workflow_stability.js'
                 ):
                     if '/' + script not in raw:
-                        extras += f'<script src="/{script}?v=20260812b"></script>'
+                        extras += f'<script src="/{script}?v=20260812c"></script>'
                 if extras:
                     before, found, after = raw.rpartition('</body>')
                     if found:
