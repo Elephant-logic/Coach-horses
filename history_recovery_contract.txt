@@ -1,0 +1,5 @@
+Recover old history
+cdc_state_v1
+cdc_dirty_v1
+legacy-device
+Generated startup-baseline rows are ignored
