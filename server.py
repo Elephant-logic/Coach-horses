@@ -6,6 +6,7 @@ import app
 import startup_history
 import auth_controls
 import logout_control
+import ai_guard
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -164,6 +165,9 @@ class Handler(app.Handler):
         path = self.path.split('?', 1)[0]
         if path == '/api/logout':
             logout_control.logout(self)
+            return
+        if path == '/api/openai/responses':
+            ai_guard.handle(self)
             return
         if path in ('/api/login', '/api/password/change', '/api/users/manage'):
             try:
