@@ -86,7 +86,7 @@ def harden_legacy_login(raw):
 
 
 RUNTIME_FILES = (
-    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/detailed_menu_recipes.js', '/reliable_menu_import.js', '/recipe_quality_upgrade.js', '/recipe_costing_fix.js', '/account_controls.js', '/logout_controls.js', '/manager_ai_temp_backfill.js', '/core_workflow_stability.js',
+    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/detailed_menu_recipes.js', '/reliable_menu_import.js', '/recipe_quality_upgrade.js', '/recipe_costing_fix.js', '/account_controls.js', '/logout_controls.js', '/manager_ai_temp_backfill.js', '/core_workflow_stability.js', '/history_truth_fix.js',
     '/runtime_loader.js',
     '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
     '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
@@ -114,6 +114,7 @@ class Handler(app.Handler):
                 '<script src="/logout_controls.js?v=20260812c"></script>'
                 '<script src="/manager_ai_temp_backfill.js?v=20260812c"></script>'
                 '<script src="/core_workflow_stability.js?v=20260812c"></script>'
+                '<script src="/history_truth_fix.js?v=20260812d"></script>'
             )
             if '/command_de_cuisine_enhancements.js' not in raw:
                 before, found, after = raw.rpartition('</body>')
@@ -122,10 +123,11 @@ class Handler(app.Handler):
             else:
                 extras = ''
                 for script in (
-                    'kitchen_fixes_20260810.js','multi_page_menu_import.js','detailed_menu_recipes.js','reliable_menu_import.js','recipe_quality_upgrade.js','recipe_costing_fix.js','account_controls.js','logout_controls.js','manager_ai_temp_backfill.js','core_workflow_stability.js'
+                    'kitchen_fixes_20260810.js','multi_page_menu_import.js','detailed_menu_recipes.js','reliable_menu_import.js','recipe_quality_upgrade.js','recipe_costing_fix.js','account_controls.js','logout_controls.js','manager_ai_temp_backfill.js','core_workflow_stability.js','history_truth_fix.js'
                 ):
                     if '/' + script not in raw:
-                        extras += f'<script src="/{script}?v=20260812c"></script>'
+                        version = '20260812d' if script == 'history_truth_fix.js' else '20260812c'
+                        extras += f'<script src="/{script}?v={version}"></script>'
                 if extras:
                     before, found, after = raw.rpartition('</body>')
                     if found:
