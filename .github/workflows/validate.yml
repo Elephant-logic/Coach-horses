@@ -54,7 +54,7 @@ jobs:
           accounts=Path('account_controls.js').read_text()
           logout_ui=Path('logout_controls.js').read_text()
           logout_server=Path('logout_control.py').read_text()
-          tts=Path('assistant_tts_fix.js').read_text()
+          core=Path('core_workflow_stability.js').read_text()
           auth=Path('auth_controls.py').read_text()
 
           for needle in [
@@ -88,7 +88,7 @@ jobs:
           for needle in [
               "model='gpt-4.1-mini'", 'Read this ONE page of a pub food menu', 'detectOnePage',
               'for(let i=0;i<pages.length;i++)', 'for(let start=0;start<dishes.length;start+=5)',
-              'Found '+"'"+'+p.count+'+"'"+' dishes', 'if(result&&result.persistPromise)await result.persistPromise',
+              'if(result&&result.persistPromise)await result.persistPromise',
               "Save menu & recipes", "Each page will be read separately for accuracy",
           ]:
               assert needle in reliable, f'missing reliable importer contract: {needle}'
@@ -116,22 +116,29 @@ jobs:
           for needle in ["Max-Age=0", "Expires=Thu, 01 Jan 1970 00:00:00 GMT", "authenticated\": False"]:
               assert needle in logout_server, f'missing logout server contract: {needle}'
 
-          for needle in ["speechSynthesis", "SpeechSynthesisUtterance", "STATE.settings.speak!==false", "Read answers aloud", "synth.cancel()", "allowSpeech!==false"]:
-              assert needle in tts, f'missing Chef TTS contract: {needle}'
+          for needle in [
+              'One detection pass + one full recipe pass only', 'PRINTED SECTION HEADING',
+              'for(let start=0;start<dishes.length;start+=3)', 'AI batch timed out', 'retrying once',
+              'commitImportedMenu=function', 'speechSynthesis', 'SpeechSynthesisUtterance',
+              'STATE.settings.speak!==false', 'Read answers aloud', 'synth.cancel()',
+              'aiReplyDepth>0', 'allowSpeech!==false'
+          ]:
+              assert needle in core, f'missing consolidated workflow contract: {needle}'
 
           for needle in ["user.pop(\"password\", None)", "def change_password", "def manage_user", "Manager access required.", "There must always be at least one active manager.", "incoming[\"users\"] = current[\"state\"].get(\"users\", [])", "incoming[\"settings\"] = current[\"state\"].get(\"settings\", {})"]:
               assert needle in auth, f'missing auth control: {needle}'
 
           assert 'tempTab="history";rerender();' not in html, 'temperature save must stay on the round'
           assert 'raw = harden_legacy_login(raw)' not in server, 'legacy front-end injection must stay disabled'
-          assert '/runtime_loader.js' not in server.split("if path == '/':",1)[1].split('data = raw.encode',1)[0], 'runtime loader must not be injected into the new base'
-          for path in ['/command_de_cuisine_enhancements.js','/kitchen_fixes_20260810.js','/multi_page_menu_import.js','/detailed_menu_recipes.js','/reliable_menu_import.js','/recipe_quality_upgrade.js','/recipe_costing_fix.js','/account_controls.js','/logout_controls.js','/assistant_tts_fix.js']:
+          injected=server.split("if path == '/':",1)[1].split('data = raw.encode',1)[0]
+          assert '/runtime_loader.js' not in injected, 'runtime loader must not be injected into the new base'
+          assert '/menu_import_stability.js' not in injected, 'old menu stability wrapper must not be injected'
+          assert '/assistant_tts_fix.js' not in injected, 'old TTS wrapper must not be injected'
+          for path in ['/command_de_cuisine_enhancements.js','/kitchen_fixes_20260810.js','/multi_page_menu_import.js','/detailed_menu_recipes.js','/reliable_menu_import.js','/recipe_quality_upgrade.js','/recipe_costing_fix.js','/account_controls.js','/logout_controls.js','/manager_ai_temp_backfill.js','/core_workflow_stability.js']:
               assert path in server, f'{path} must be loaded'
-          assert server.index('/reliable_menu_import.js?v=20260812b') > server.index('/detailed_menu_recipes.js?v=20260812b'), 'reliable importer must load after detailed recipe override'
-          assert server.index('/recipe_quality_upgrade.js?v=20260812b') > server.index('/reliable_menu_import.js?v=20260812b'), 'recipe quality must load after reliable importer'
-          assert server.index('/recipe_costing_fix.js?v=20260812b') > server.index('/recipe_quality_upgrade.js?v=20260812b'), 'costing fix must load after quality upgrade'
-          assert server.index('/logout_controls.js?v=20260812b') > server.index('/account_controls.js?v=20260812b'), 'logout UI must load after account controls'
-          assert server.index('/assistant_tts_fix.js?v=20260812b') > server.index('/manager_ai_temp_backfill.js?v=20260812b'), 'TTS fix must load after Chef command overrides'
+          assert server.index('/reliable_menu_import.js?v=20260812c') > server.index('/detailed_menu_recipes.js?v=20260812c'), 'reliable importer must load after detailed recipe override'
+          assert server.index('/recipe_quality_upgrade.js?v=20260812c') > server.index('/reliable_menu_import.js?v=20260812c'), 'recipe quality controls must load after reliable importer'
+          assert server.index('/core_workflow_stability.js?v=20260812c') > server.index('/manager_ai_temp_backfill.js?v=20260812c'), 'consolidated workflow owner must load last'
           assert "path == '/api/session'" in server and "auth_controls.send_session" in server
           assert "path == '/api/logout'" in server and 'logout_control.logout(self)' in server
           assert "'/api/login', '/api/password/change', '/api/users/manage'" in server
