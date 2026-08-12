@@ -28,11 +28,4 @@
       v.append(card);
     };
   }
-
-  if(!document.querySelector('script[data-paper-temperature-recovery]')){
-    const s=document.createElement('script');
-    s.src='/delivery_patch.js?v=paper-temp-recovery-20260812';
-    s.dataset.paperTemperatureRecovery='1';
-    document.head.appendChild(s);
-  }
 })();

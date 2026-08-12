@@ -7,7 +7,7 @@ import urllib.request
 from collections import defaultdict, deque
 
 ALLOWED_MODELS = {"gpt-4o-mini", "gpt-4.1-mini"}
-MAX_AI_REQUEST_BYTES = 2 * 1024 * 1024
+MAX_AI_REQUEST_BYTES = 5 * 1024 * 1024
 RATE_WINDOW_SECONDS = 10 * 60
 RATE_LIMIT = 90
 
@@ -44,7 +44,7 @@ def handle(handler):
 
     raw_payload = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
     if len(raw_payload) > MAX_AI_REQUEST_BYTES:
-        handler.send_json({"error": {"message": "AI request is too large."}}, 413)
+        handler.send_json({"error": {"message": "AI image/request is too large. The app will resize photos before retrying."}}, 413)
         return
 
     if not _allow(user.get("username")):
