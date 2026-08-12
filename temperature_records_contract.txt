@@ -1,0 +1,6 @@
+Temperature records
+Import paper sheets
+paper-log-import
+paper-log-gap
+Existing readings are never overwritten
+AI image/request is too large
