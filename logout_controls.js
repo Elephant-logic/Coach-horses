@@ -105,7 +105,7 @@ Rules: transcribe only what is visibly written. Never infer, average, fill or in
   function showPreview(sheets){
     const plan=buildPlan(sheets),body=el('div',{});
     body.append(el('p',{class:'muted',style:'margin-top:0'},'Nothing is saved yet. Existing readings always win. Only clearly readable numbers become temperature readings; unreadable or blank cells are documented separately and never given an invented value.'));
-    sheets.forEach(s=>body.append(el('div',{class:'docket',style:'margin-bottom:6px'},el('div',{},el('div',{class:'dk-t'},String(s.month).padStart(2,'0')+'/'+s.year+' · '+(s.sourceFile||'paper sheet')),el('div',{class:'dk-s'},(s.rows||[]).length+' handwritten day rows detected'))));
+    sheets.forEach(s=>body.append(el('div',{class:'docket',style:'margin-bottom:6px'},el('div',{},el('div',{class:'dk-t'},String(s.month).padStart(2,'0')+'/'+s.year+' · '+(s.sourceFile||'paper sheet')),el('div',{class:'dk-s'},(s.rows||[]).length+' handwritten day rows detected')))));
     body.append(el('div',{class:'grid g3',style:'margin-top:12px'},
       el('div',{class:'card'},el('div',{class:'eyebrow'},'Restore'),el('div',{style:'font-size:24px;font-weight:700'},String(plan.readings.length)),el('div',{class:'muted'},'readable readings')),
       el('div',{class:'card'},el('div',{class:'eyebrow'},'Document'),el('div',{style:'font-size:24px;font-weight:700'},String(plan.gaps.length)),el('div',{class:'muted'},'unreadable / blank cells')),
