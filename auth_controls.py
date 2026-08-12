@@ -22,6 +22,27 @@ def _password_ok(value):
     return isinstance(value, str) and len(value) >= 10
 
 
+def _canon(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _append_only_preserved(current_state, incoming_state, key):
+    old = current_state.get(key, [])
+    new = incoming_state.get(key, [])
+    if not isinstance(old, list) or not isinstance(new, list):
+        return old == new
+    new_by_id = {str(x.get("id")): x for x in new if isinstance(x, dict) and x.get("id") is not None}
+    new_exact = {_canon(x) for x in new}
+    for item in old:
+        if isinstance(item, dict) and item.get("id") is not None:
+            kept = new_by_id.get(str(item.get("id")))
+            if kept is None or _canon(kept) != _canon(item):
+                return False
+        elif _canon(item) not in new_exact:
+            return False
+    return True
+
+
 def send_session(handler):
     stored = app.read_state()
     if not stored:
@@ -156,6 +177,14 @@ def save_state(handler, payload):
             conn.rollback(); handler.send_json({"error": "Not initialised."}, 409); return
         if expected_revision != current["revision"]:
             conn.rollback(); handler.send_json({"error": "Another user saved changes first. Latest shared data has been returned.", "conflict": True, **_public_state(current)}, 409); return
+
+        # Compliance evidence already stored on the server is append-only. Browser saves may add
+        # new records but cannot silently rewrite/delete previous temperature or audit history.
+        for key, label in (("tempReadings", "temperature"), ("audit", "audit")):
+            if not _append_only_preserved(current["state"], incoming, key):
+                conn.rollback()
+                handler.send_json({"error": f"Existing {label} history is append-only and cannot be changed or deleted."}, 400)
+                return
 
         # Password hashes never come from the browser. Restore them from the locked server copy.
         current_users = {str(u.get("id") or u.get("username")): u for u in current["state"].get("users", [])}
