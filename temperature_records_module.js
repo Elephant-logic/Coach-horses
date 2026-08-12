@@ -41,10 +41,38 @@
       return out;
     }
 
-    function parseObject(text){
-      const s=String(text||''),a=s.indexOf('{'),b=s.lastIndexOf('}');
+    function jsonSlice(text){
+      let s=String(text||'').trim();
+      s=s.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+      const a=s.indexOf('{'),b=s.lastIndexOf('}');
       if(a<0||b<a)throw new Error('The sheet reader returned no usable data');
-      return JSON.parse(s.slice(a,b+1));
+      return s.slice(a,b+1);
+    }
+
+    function parseObject(text){
+      const raw=jsonSlice(text);
+      try{return JSON.parse(raw);}catch(first){}
+      // Common model formatting slips: smart quotes and trailing commas.
+      const cleaned=raw
+        .replace(/[“”]/g,'"')
+        .replace(/[‘’]/g,"'")
+        .replace(/,\s*([}\]])/g,'$1')
+        .replace(/\u00a0/g,' ');
+      try{return JSON.parse(cleaned);}catch(second){
+        const e=new Error(second.message||'Malformed extraction JSON');
+        e.rawExtraction=raw;
+        throw e;
+      }
+    }
+
+    async function repairObject(text,name){
+      const raw=jsonSlice(text);
+      const repairPrompt=`Repair the following malformed JSON from a Safe Catering temperature-sheet transcription. Return ONLY valid JSON. Do not change, infer, add, remove, average or guess any temperature values. Preserve every readable number, minus sign, month, year, day, signer and readable/unreadable/blank mark exactly as present. Only repair JSON syntax. File: ${name}\n\n${raw}`;
+      const r=await api('/api/openai/responses',{
+        method:'POST',
+        body:JSON.stringify({model:'gpt-4.1-mini',input:[{role:'user',content:[{type:'input_text',text:repairPrompt}]}]})
+      });
+      return parseObject(responseText(r));
     }
 
     async function prepareImage(file){
@@ -80,7 +108,10 @@ Transcribe only visible handwritten values. Never infer, average or invent. Pres
             input:[{role:'user',content:[{type:'input_text',text:prompt},{type:'input_image',image_url:image}]}]
           })
         });
-        const obj=parseObject(responseText(r));
+        const raw=responseText(r);
+        let obj;
+        try{obj=parseObject(raw);}
+        catch(parseErr){obj=await repairObject(raw,name);}
         if(!obj.month||!obj.year||!Array.isArray(obj.rows))throw new Error('Month/year or table rows could not be identified');
         obj.sourceFile=name;
         return obj;
