@@ -7,7 +7,6 @@
     try{
       await api('/api/logout',{method:'POST',body:'{}'});
     }catch(err){
-      // Reload anyway: if the request reached the server the cookie may already be cleared.
       console.error('Logout request failed',err);
     }
     try{ localStorage.removeItem('command_de_cuisine_session'); }catch{}
@@ -28,5 +27,12 @@
       );
       v.append(card);
     };
+  }
+
+  if(!document.querySelector('script[data-paper-temperature-recovery]')){
+    const s=document.createElement('script');
+    s.src='/delivery_patch.js?v=paper-temp-recovery-20260812';
+    s.dataset.paperTemperatureRecovery='1';
+    document.head.appendChild(s);
   }
 })();
