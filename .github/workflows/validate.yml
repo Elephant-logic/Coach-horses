@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: '22'
       - name: Python syntax
-        run: python -m py_compile app.py server.py startup_history.py auth_controls.py logout_control.py
+        run: python -m py_compile app.py server.py startup_history.py auth_controls.py logout_control.py ai_guard.py
       - name: JavaScript syntax
         shell: bash
         run: |
@@ -56,6 +56,7 @@ jobs:
           logout_server=Path('logout_control.py').read_text()
           core=Path('core_workflow_stability.js').read_text()
           auth=Path('auth_controls.py').read_text()
+          ai=Path('ai_guard.py').read_text()
 
           for needle in [
               'Command de Cuisine — The Coach &amp; Horses',
@@ -125,8 +126,22 @@ jobs:
           ]:
               assert needle in core, f'missing consolidated workflow contract: {needle}'
 
-          for needle in ["user.pop(\"password\", None)", "def change_password", "def manage_user", "Manager access required.", "There must always be at least one active manager.", "incoming[\"users\"] = current[\"state\"].get(\"users\", [])", "incoming[\"settings\"] = current[\"state\"].get(\"settings\", {})"]:
-              assert needle in auth, f'missing auth control: {needle}'
+          for needle in [
+              "def _append_only_preserved", 'Existing {label} history is append-only',
+              '("tempReadings", "temperature")', '("audit", "audit")',
+              "user.pop(\"password\", None)", "def change_password", "def manage_user",
+              "Manager access required.", "There must always be at least one active manager.",
+              "incoming[\"users\"] = current[\"state\"].get(\"users\", [])",
+              "incoming[\"settings\"] = current[\"state\"].get(\"settings\", {})"
+          ]:
+              assert needle in auth, f'missing auth/compliance control: {needle}'
+
+          for needle in [
+              'ALLOWED_MODELS = {"gpt-4o-mini", "gpt-4.1-mini"}',
+              'MAX_AI_REQUEST_BYTES', 'RATE_LIMIT = 90', 'RATE_WINDOW_SECONDS = 10 * 60',
+              'payload["store"] = False', 'Too many AI requests', 'That AI model is not allowed'
+          ]:
+              assert needle in ai, f'missing AI proxy guard: {needle}'
 
           assert 'tempTab="history";rerender();' not in html, 'temperature save must stay on the round'
           assert 'raw = harden_legacy_login(raw)' not in server, 'legacy front-end injection must stay disabled'
@@ -141,6 +156,7 @@ jobs:
           assert server.index('/core_workflow_stability.js?v=20260812c') > server.index('/manager_ai_temp_backfill.js?v=20260812c'), 'consolidated workflow owner must load last'
           assert "path == '/api/session'" in server and "auth_controls.send_session" in server
           assert "path == '/api/logout'" in server and 'logout_control.logout(self)' in server
+          assert "path == '/api/openai/responses'" in server and 'ai_guard.handle(self)' in server
           assert "'/api/login', '/api/password/change', '/api/users/manage'" in server
           assert 'auth_controls.save_state' in server
           assert 'python server.py' in Path('render.yaml').read_text()
