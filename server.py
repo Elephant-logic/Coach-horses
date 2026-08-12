@@ -86,7 +86,7 @@ def harden_legacy_login(raw):
 
 
 RUNTIME_FILES = (
-    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/detailed_menu_recipes.js', '/reliable_menu_import.js', '/recipe_quality_upgrade.js', '/recipe_costing_fix.js', '/account_controls.js', '/logout_controls.js', '/manager_ai_temp_backfill.js', '/core_workflow_stability.js', '/history_truth_fix.js', '/temperature_records_module.js', '/temperature_history_reconcile.js',
+    '/command_de_cuisine_enhancements.js', '/kitchen_fixes_20260810.js', '/multi_page_menu_import.js', '/detailed_menu_recipes.js', '/reliable_menu_import.js', '/recipe_quality_upgrade.js', '/recipe_costing_fix.js', '/account_controls.js', '/logout_controls.js', '/manager_ai_temp_backfill.js', '/core_workflow_stability.js', '/history_truth_fix.js', '/temperature_records_module.js', '/temperature_history_reconcile.js', '/temperature_gap_fill.js',
     '/runtime_loader.js',
     '/delivery_patch.js', '/ai_server_patch.js', '/compliance_patch.js',
     '/login_cleanup_patch.js', '/recipe_management_patch.js', '/clockin_session_patch.js',
@@ -117,6 +117,7 @@ class Handler(app.Handler):
                 '<script src="/history_truth_fix.js?v=20260812d"></script>'
                 '<script src="/temperature_records_module.js?v=20260812f"></script>'
                 '<script src="/temperature_history_reconcile.js?v=20260812a"></script>'
+                '<script src="/temperature_gap_fill.js?v=20260812a"></script>'
             )
             if '/command_de_cuisine_enhancements.js' not in raw:
                 before, found, after = raw.rpartition('</body>')
@@ -125,10 +126,10 @@ class Handler(app.Handler):
             else:
                 extras = ''
                 for script in (
-                    'kitchen_fixes_20260810.js','multi_page_menu_import.js','detailed_menu_recipes.js','reliable_menu_import.js','recipe_quality_upgrade.js','recipe_costing_fix.js','account_controls.js','logout_controls.js','manager_ai_temp_backfill.js','core_workflow_stability.js','history_truth_fix.js','temperature_records_module.js','temperature_history_reconcile.js'
+                    'kitchen_fixes_20260810.js','multi_page_menu_import.js','detailed_menu_recipes.js','reliable_menu_import.js','recipe_quality_upgrade.js','recipe_costing_fix.js','account_controls.js','logout_controls.js','manager_ai_temp_backfill.js','core_workflow_stability.js','history_truth_fix.js','temperature_records_module.js','temperature_history_reconcile.js','temperature_gap_fill.js'
                 ):
                     if '/' + script not in raw:
-                        version = '20260812a' if script == 'temperature_history_reconcile.js' else ('20260812f' if script == 'temperature_records_module.js' else ('20260812d' if script == 'history_truth_fix.js' else '20260812c'))
+                        version = '20260812a' if script in ('temperature_history_reconcile.js','temperature_gap_fill.js') else ('20260812f' if script == 'temperature_records_module.js' else ('20260812d' if script == 'history_truth_fix.js' else '20260812c'))
                         extras += f'<script src="/{script}?v={version}"></script>'
                 if extras:
                     before, found, after = raw.rpartition('</body>')
