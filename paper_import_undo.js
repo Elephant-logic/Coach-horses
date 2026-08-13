@@ -91,3 +91,54 @@
   }
   install();
 })();
+
+// Touch-friendly +/- temperature controls for live and historic temperature forms.
+(function(){
+  'use strict';
+  if(window.__temperatureStepperInstalled)return;
+  window.__temperatureStepperInstalled=true;
+  const style=document.createElement('style');
+  style.textContent='.temp-stepper{display:grid;grid-template-columns:52px minmax(88px,1fr) 52px;gap:8px;align-items:stretch;width:100%}.temp-stepper .temp-step-btn{min-height:50px;border-radius:9px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink);font-size:26px;font-weight:700;display:grid;place-items:center;touch-action:manipulation}.temp-stepper input[type=number]{min-height:50px;text-align:center;font-family:var(--mono);font-size:19px;font-weight:600;margin:0}.temp-stepper input[type=number]::-webkit-inner-spin-button,.temp-stepper input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}';
+  document.head.appendChild(style);
+
+  function isTemperatureInput(input){
+    if(!(input instanceof HTMLInputElement)||input.type!=='number'||input.dataset.tempStepper==='1')return false;
+    const text=((input.placeholder||'')+' '+(input.name||'')+' '+(input.getAttribute('aria-label')||'')+' '+(input.closest('label')?.innerText||'')).toLowerCase();
+    return text.includes('°c')||text.includes('temperature')||text.includes('fridge')||text.includes('freezer')||text.includes('cold room')||text.includes('hot hold');
+  }
+
+  function enhance(input){
+    if(!isTemperatureInput(input))return;
+    input.dataset.tempStepper='1';
+    if(!input.step||input.step==='any')input.step='0.1';
+    const wrap=document.createElement('div');
+    wrap.className='temp-stepper';
+    const down=document.createElement('button');
+    down.type='button';down.className='temp-step-btn';down.textContent='−';down.setAttribute('aria-label','Decrease temperature');
+    const up=document.createElement('button');
+    up.type='button';up.className='temp-step-btn';up.textContent='+';up.setAttribute('aria-label','Increase temperature');
+    input.parentNode.insertBefore(wrap,input);
+    wrap.append(down,input,up);
+
+    function change(direction){
+      const step=Number(input.step)||0.1;
+      let value=Number(input.value);
+      if(!Number.isFinite(value))value=0;
+      value+=direction*step;
+      if(input.min!==''&&Number.isFinite(Number(input.min)))value=Math.max(Number(input.min),value);
+      if(input.max!==''&&Number.isFinite(Number(input.max)))value=Math.min(Number(input.max),value);
+      input.value=(Math.round(value*10)/10).toFixed(1);
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    down.addEventListener('click',()=>change(-1));
+    up.addEventListener('click',()=>change(1));
+  }
+
+  function scan(root){
+    if(root.matches&&root.matches('input[type=number]'))enhance(root);
+    if(root.querySelectorAll)root.querySelectorAll('input[type=number]').forEach(enhance);
+  }
+  scan(document);
+  new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(node=>{if(node.nodeType===1)scan(node);}))).observe(document.body,{childList:true,subtree:true});
+})();
