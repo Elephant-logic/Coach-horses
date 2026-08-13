@@ -113,10 +113,7 @@
   install();
 })();
 
-// Save reliability: the original audit() function trims to 400 rows. The server currently
-// treats audit as append-only, so trimming one old row can reject an otherwise valid save.
-// Keep the existing audit rows until the server-side rule is relaxed; temperature history
-// itself remains append-only and untouched by this patch.
+// Keep browser activity history bounded without allowing it to jam temperature saves.
 (function(){
   'use strict';
   function installAuditSaveFix(){
@@ -126,7 +123,80 @@
     audit=function(action,detail){
       STATE.audit=Array.isArray(STATE.audit)?STATE.audit:[];
       STATE.audit.unshift({id:uid('a'),ts:nowISO(),user:(typeof ME!=='undefined'&&ME?ME.username:'local'),action,detail:detail||''});
+      STATE.audit=STATE.audit.slice(0,400);
     };
   }
   installAuditSaveFix();
+})();
+
+// Compact manager saves: ordinary edits send only changed top-level sections, and live
+// temperature checks send only newly appended readings instead of the whole historic state.
+(function(){
+  'use strict';
+  function installCompactSave(){
+    if(typeof STATE==='undefined'||typeof persist!=='function'||typeof api!=='function'||typeof updateSync!=='function'||typeof serverMode==='undefined')return setTimeout(installCompactSave,150);
+    if(serverMode&&(!ME||ME.role!=='manager'))return setTimeout(installCompactSave,300);
+    if(window.__compactStateSaveInstalled)return;
+    window.__compactStateSaveInstalled=true;
+
+    const originalPersist=persist;
+    const clone=x=>JSON.parse(JSON.stringify(x));
+    const canon=x=>JSON.stringify(x);
+    let base=clone(STATE);
+
+    function additions(current,previous){
+      const prevIds=new Set((previous||[]).filter(x=>x&&x.id!=null).map(x=>String(x.id)));
+      return (current||[]).filter(x=>x&&x.id!=null&&!prevIds.has(String(x.id)));
+    }
+    function existingChanged(current,previous){
+      const cur=new Map((current||[]).filter(x=>x&&x.id!=null).map(x=>[String(x.id),x]));
+      for(const old of (previous||[])){
+        if(!old||old.id==null)continue;
+        const now=cur.get(String(old.id));
+        if(!now||canon(now)!==canon(old))return true;
+      }
+      return false;
+    }
+    function makePayload(reason){
+      const changes={};
+      const protectedKeys=new Set(['tempReadings','audit','users','settings']);
+      const keys=new Set([...Object.keys(base||{}),...Object.keys(STATE||{})]);
+      for(const key of keys){
+        if(protectedKeys.has(key))continue;
+        if(canon((base||{})[key])!==canon(STATE[key]))changes[key]=STATE[key];
+      }
+      return {
+        action:'compact-state-save',revision:REV,reason:reason||'edit',changes,
+        temperatureAdditions:additions(STATE.tempReadings,base.tempReadings),
+        auditAdditions:additions(STATE.audit,base.audit)
+      };
+    }
+
+    persist=async function(reason){
+      if(!serverMode||!ME||ME.role!=='manager')return originalPersist(reason);
+      // Account/security settings continue to use the original hardened save path.
+      if(canon(base.users)!==canon(STATE.users)||canon(base.settings)!==canon(STATE.settings))return originalPersist(reason);
+      // Existing temperatures are protected; this compact path only appends new readings.
+      if(existingChanged(STATE.tempReadings,base.tempReadings))return originalPersist(reason);
+
+      const payload=makePayload(reason);
+      const hasChanges=Object.keys(payload.changes).length||payload.temperatureAdditions.length||payload.auditAdditions.length;
+      if(!hasChanges){DIRTY=false;ONLINE=true;localStorage.removeItem(LS_QUEUE);updateSync();return;}
+      try{
+        const res=await api('/api/temperature-paper-import/undo',{method:'POST',body:JSON.stringify(payload)});
+        REV=res.revision;DIRTY=false;ONLINE=true;base=clone(STATE);localStorage.removeItem(LS_QUEUE);updateSync();
+      }catch(err){
+        if(err.status===409&&err.data&&err.data.state){
+          STATE=migrate(err.data.state);REV=err.data.revision;base=clone(STATE);DIRTY=false;ONLINE=true;localStorage.removeItem(LS_QUEUE);updateSync();toast('Reloaded newer shared data','warn');rerender();
+        }else{
+          ONLINE=false;
+          try{localStorage.setItem(LS_QUEUE,JSON.stringify({compact:true,reason:reason||'edit',ts:Date.now()}));}catch{}
+          updateSync();
+          const msg=err&&err.data&&err.data.stateBytes?('Save blocked: app state is '+(err.data.stateBytes/1048576).toFixed(1)+' MB'):'';
+          if(msg)toast(msg,'bad');
+        }
+      }
+    };
+  }
+  installCompactSave();
 })();
