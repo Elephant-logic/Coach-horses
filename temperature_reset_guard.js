@@ -112,3 +112,21 @@
   }
   install();
 })();
+
+// Save reliability: the original audit() function trims to 400 rows. The server currently
+// treats audit as append-only, so trimming one old row can reject an otherwise valid save.
+// Keep the existing audit rows until the server-side rule is relaxed; temperature history
+// itself remains append-only and untouched by this patch.
+(function(){
+  'use strict';
+  function installAuditSaveFix(){
+    if(typeof STATE==='undefined'||typeof uid!=='function'||typeof nowISO!=='function')return setTimeout(installAuditSaveFix,150);
+    if(window.__boundedAuditSaveFixInstalled)return;
+    window.__boundedAuditSaveFixInstalled=true;
+    audit=function(action,detail){
+      STATE.audit=Array.isArray(STATE.audit)?STATE.audit:[];
+      STATE.audit.unshift({id:uid('a'),ts:nowISO(),user:(typeof ME!=='undefined'&&ME?ME.username:'local'),action,detail:detail||''});
+    };
+  }
+  installAuditSaveFix();
+})();
