@@ -142,3 +142,91 @@
   scan(document);
   new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(node=>{if(node.nodeType===1)scan(node);}))).observe(document.body,{childList:true,subtree:true});
 })();
+
+// Reversible reset for historic temperature recovery/import data.
+(function(){
+  'use strict';
+  function install(){
+    if(typeof VIEWS==='undefined'||typeof STATE==='undefined'||typeof el!=='function'||typeof modal!=='function')return setTimeout(install,150);
+    if(window.__historicTemperatureResetInstalled)return;
+    window.__historicTemperatureResetInstalled=true;
+    const recoverySources=new Set(['paper-log-import','backfill-file-import','manager-backfill']);
+    const gapSources=new Set(['paper-log-gap','backfill-file-gap']);
+    const isRecovery=r=>r&&recoverySources.has(String(r.source||''));
+    const isGap=g=>g&&gapSources.has(String(g.source||''));
+
+    function summary(){
+      const rows=(STATE.tempReadings||[]).filter(isRecovery);
+      const gaps=(STATE.paperTempGaps||[]).filter(isGap);
+      const by={};rows.forEach(r=>{const k=String(r.source||'unknown');by[k]=(by[k]||0)+1;});
+      const dates=rows.map(r=>String(r.ts||'').slice(0,10)).filter(Boolean).sort();
+      return {rows,gaps,by,from:dates[0]||'',to:dates[dates.length-1]||''};
+    }
+    async function persistReset(reason){
+      if(typeof save==='function')save(reason);
+      if(typeof persist==='function')await persist(reason);
+    }
+    function openReset(){
+      if(typeof isMgr==='function'&&!isMgr())return toast('Manager access required','warn');
+      const s=summary();
+      const body=el('div',{});
+      body.append(
+        el('div',{class:'notice warn'},'This clears historic recovery/import data only. Normal live temperature readings are kept.'),
+        el('div',{class:'docket',style:'margin-top:10px'},el('div',{},
+          el('div',{class:'dk-t'},s.rows.length+' recovery readings · '+s.gaps.length+' documented gaps'),
+          el('div',{class:'dk-s'},(s.from&&s.to?s.from+' to '+s.to+' · ':'')+Object.entries(s.by).map(([k,v])=>k+': '+v).join(' · '))
+        )),
+        el('p',{class:'muted'},'Before clearing anything, the current recovery rows are copied into a reset archive inside the app. You can restore the most recent reset afterwards.'),
+        el('label',{},el('div',{class:'eyebrow',style:'margin:'+'12px 0 6px'},'Type RESET HISTORIC to confirm'),el('input',{class:'inp',id:'historicTempResetConfirm',placeholder:'RESET HISTORIC',autocomplete:'off'}))
+      );
+      let m;
+      const reset=el('button',{class:'btn danger',html:'Reset historic recovery'});
+      reset.onclick=async()=>{
+        const typed=(body.querySelector('#historicTempResetConfirm')||{}).value||'';
+        if(typed!=='RESET HISTORIC')return toast('Type RESET HISTORIC exactly','warn');
+        reset.disabled=true;
+        try{
+          const archive={id:'temp-reset-'+Date.now(),resetAt:new Date().toISOString(),resetBy:(typeof ME!=='undefined'&&ME&&ME.username)||'manager',readings:s.rows,gaps:s.gaps};
+          STATE.temperatureRecoveryArchive=Array.isArray(STATE.temperatureRecoveryArchive)?STATE.temperatureRecoveryArchive:[];
+          STATE.temperatureRecoveryArchive.push(archive);
+          STATE.temperatureRecoveryArchive=STATE.temperatureRecoveryArchive.slice(-5);
+          STATE.tempReadings=(STATE.tempReadings||[]).filter(r=>!isRecovery(r));
+          STATE.paperTempGaps=(STATE.paperTempGaps||[]).filter(g=>!isGap(g));
+          if(typeof audit==='function')audit('reset_historic_temperature_recovery',s.rows.length+' recovery readings and '+s.gaps.length+' gaps archived and cleared');
+          await persistReset('reset historic temperature recovery');
+          toast('Historic recovery reset. Live readings kept.','ok');
+          m.close();setTimeout(()=>location.reload(),300);
+        }catch(e){reset.disabled=false;toast((e&&e.message)||String(e),'bad');}
+      };
+      m=modal({title:'Start temperature history afresh',body,footer:[el('button',{class:'btn ghost',html:'Cancel',onclick:()=>m.close()}),reset]});
+    }
+    async function restoreLast(){
+      if(typeof isMgr==='function'&&!isMgr())return toast('Manager access required','warn');
+      const archive=Array.isArray(STATE.temperatureRecoveryArchive)?STATE.temperatureRecoveryArchive:[];
+      if(!archive.length)return toast('There is no temperature reset to restore','warn');
+      const last=archive[archive.length-1];
+      const ids=new Set((STATE.tempReadings||[]).map(r=>String(r&&r.id||'')));
+      const gapIds=new Set((STATE.paperTempGaps||[]).map(g=>String(g&&g.id||'')));
+      const readings=(last.readings||[]).filter(r=>!ids.has(String(r&&r.id||'')));
+      const gaps=(last.gaps||[]).filter(g=>!gapIds.has(String(g&&g.id||'')));
+      STATE.tempReadings=(STATE.tempReadings||[]).concat(readings);
+      STATE.paperTempGaps=(STATE.paperTempGaps||[]).concat(gaps);
+      STATE.temperatureRecoveryArchive=archive.slice(0,-1);
+      if(typeof audit==='function')audit('restore_historic_temperature_reset',readings.length+' readings and '+gaps.length+' gaps restored');
+      try{await persistReset('restore historic temperature reset');toast('Last historic reset restored','ok');setTimeout(()=>location.reload(),300);}catch(e){toast((e&&e.message)||String(e),'bad');}
+    }
+    window.openHistoricTemperatureReset=openReset;
+    window.restoreLastHistoricTemperatureReset=restoreLast;
+    function card(){
+      const c=el('div',{class:'card',style:'margin-bottom:16px;border-color:rgba(255,170,70,.35)'});
+      const h=el('div',{class:'card-head'},el('h3',{},'Start historic temperatures afresh'),el('div',{class:'spacer'}));
+      if(typeof isMgr!=='function'||isMgr())h.append(el('button',{class:'btn danger',html:'Reset historic recovery',onclick:openReset}));
+      c.append(h,el('p',{class:'muted'},'Clears paper imports, prepared recovery imports and manager historic backfills while preserving normal live readings. The last reset can be restored.'));
+      if(typeof isMgr!=='function'||isMgr())c.append(el('button',{class:'btn ghost sm',html:'Restore last reset',onclick:restoreLast}));
+      return c;
+    }
+    const old=VIEWS.temprecords;
+    if(typeof old==='function')VIEWS.temprecords=function(v){v.append(card());old(v);};
+  }
+  install();
+})();
