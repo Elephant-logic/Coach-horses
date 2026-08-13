@@ -43,6 +43,48 @@ def _append_only_preserved(current_state, incoming_state, key):
     return True
 
 
+def _append_only_additions(base_state, incoming_state, key):
+    base = base_state.get(key, [])
+    new = incoming_state.get(key, [])
+    if not isinstance(base, list) or not isinstance(new, list):
+        return None
+    base_ids = {str(x.get("id")) for x in base if isinstance(x, dict) and x.get("id") is not None}
+    base_exact = {_canon(x) for x in base}
+    additions = []
+    for item in new:
+        if isinstance(item, dict) and item.get("id") is not None:
+            if str(item.get("id")) not in base_ids:
+                additions.append(item)
+        elif _canon(item) not in base_exact:
+            additions.append(item)
+    return additions
+
+
+def _merge_conflict_append_only(current_state, incoming_state):
+    merged = json.loads(json.dumps(current_state))
+    changed = False
+    for key in ("tempReadings", "audit"):
+        additions = _append_only_additions(current_state, incoming_state, key)
+        if additions is None:
+            return None
+        existing = merged.get(key, [])
+        existing_ids = {str(x.get("id")) for x in existing if isinstance(x, dict) and x.get("id") is not None}
+        existing_exact = {_canon(x) for x in existing}
+        for item in additions:
+            if isinstance(item, dict) and item.get("id") is not None:
+                if str(item.get("id")) in existing_ids:
+                    continue
+                existing.append(item)
+                existing_ids.add(str(item.get("id")))
+                changed = True
+            elif _canon(item) not in existing_exact:
+                existing.append(item)
+                existing_exact.add(_canon(item))
+                changed = True
+        merged[key] = existing
+    return merged if changed else None
+
+
 def send_session(handler):
     stored = app.read_state()
     if not stored:
@@ -126,10 +168,7 @@ def manage_user(handler, payload):
             state = row["state"]
             target = next((u for u in state.get("users", []) if str(u.get("username", "")).lower() == username), None)
             if not target:
-                conn.rollback()
-                handler.send_json({"error": "Account not found."}, 404)
-                return
-
+                conn.rollback(); handler.send_json({"error": "Account not found."}, 404); return
             if "name" in payload:
                 target["name"] = str(payload.get("name") or target.get("name") or username).strip()
             if "jobTitle" in payload:
@@ -149,11 +188,9 @@ def manage_user(handler, payload):
                 target["password"] = app.hash_password(new_password)
                 target["passwordResetAt"] = app.utcnow()
                 target["mustChangePassword"] = True
-
             active_managers = [u for u in state.get("users", []) if u.get("role") == "manager" and u.get("active", True)]
             if not active_managers:
                 conn.rollback(); handler.send_json({"error": "There must always be at least one active manager."}, 400); return
-
             revision = int(row["revision"]) + 1
             cur.execute("UPDATE app_state SET state=%s::jsonb, revision=%s, updated_at=NOW(), updated_by=%s WHERE id=1", (json.dumps(state, ensure_ascii=False, separators=(",", ":")), revision, manager["username"]))
             cur.execute("INSERT INTO server_audit(username,action,revision,details) VALUES(%s,%s,%s,%s::jsonb)", (manager["username"], "manage_user", revision, json.dumps({"account": username, "role": target.get("role"), "active": target.get("active", True), "password_reset": new_password is not None})))
@@ -175,18 +212,21 @@ def save_state(handler, payload):
         current = app.read_state(conn, for_update=True)
         if not current:
             conn.rollback(); handler.send_json({"error": "Not initialised."}, 409); return
-        if expected_revision != current["revision"]:
-            conn.rollback(); handler.send_json({"error": "Another user saved changes first. Latest shared data has been returned.", "conflict": True, **_public_state(current)}, 409); return
 
-        # Compliance evidence already stored on the server is append-only. Browser saves may add
-        # new records but cannot silently rewrite/delete previous temperature or audit history.
+        conflict_merge = False
+        if expected_revision != current["revision"]:
+            merged = _merge_conflict_append_only(current["state"], incoming)
+            if merged is None:
+                conn.rollback(); handler.send_json({"error": "Another user saved changes first. Latest shared data has been returned.", "conflict": True, **_public_state(current)}, 409); return
+            incoming = merged
+            conflict_merge = True
+
         for key, label in (("tempReadings", "temperature"), ("audit", "audit")):
             if not _append_only_preserved(current["state"], incoming, key):
                 conn.rollback()
                 handler.send_json({"error": f"Existing {label} history is append-only and cannot be changed or deleted."}, 400)
                 return
 
-        # Password hashes never come from the browser. Restore them from the locked server copy.
         current_users = {str(u.get("id") or u.get("username")): u for u in current["state"].get("users", [])}
         if user.get("role") != "manager":
             incoming["users"] = current["state"].get("users", [])
@@ -205,6 +245,6 @@ def save_state(handler, payload):
         revision = current["revision"] + 1
         with conn.cursor() as cur:
             cur.execute("UPDATE app_state SET state=%s::jsonb, revision=%s, updated_at=NOW(), updated_by=%s WHERE id=1", (raw, revision, user["username"]))
-            cur.execute("INSERT INTO server_audit(username,action,revision,details) VALUES(%s,%s,%s,%s::jsonb)", (user["username"], "save_state", revision, json.dumps({"reason": str(payload.get("reason", "client save"))})))
+            cur.execute("INSERT INTO server_audit(username,action,revision,details) VALUES(%s,%s,%s,%s::jsonb)", (user["username"], "save_state", revision, json.dumps({"reason": str(payload.get("reason", "client save")), "conflict_append_merge": conflict_merge})))
         conn.commit()
-    handler.send_json({"ok": True, "revision": revision})
+    handler.send_json({"ok": True, "revision": revision, "conflictAppendMerge": conflict_merge})
