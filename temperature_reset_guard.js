@@ -129,3 +129,68 @@
   }
   installAuditSaveFix();
 })();
+
+// Live manager temperature saves use the existing atomic temperature endpoint instead of
+// uploading the entire multi-megabyte kitchen state. Only temperature-only edits take this
+// path; unrelated kitchen changes continue through the normal state save.
+(function(){
+  'use strict';
+  function installAtomicLiveTemperatureSave(){
+    if(typeof STATE==='undefined'||typeof persist!=='function'||typeof api!=='function'||typeof updateSync!=='function'||typeof serverMode==='undefined'||typeof ME==='undefined')return setTimeout(installAtomicLiveTemperatureSave,150);
+    if(!serverMode||!ME||ME.role!=='manager')return;
+    if(window.__atomicLiveTemperatureSaveInstalled)return;
+    window.__atomicLiveTemperatureSaveInstalled=true;
+
+    const originalPersist=persist;
+    let knownTempIds=new Set((STATE.tempReadings||[]).filter(r=>r&&r.id!=null).map(r=>String(r.id)));
+    const otherState=()=>{
+      const copy={};
+      for(const key of Object.keys(STATE||{})) if(key!=='tempReadings'&&key!=='audit') copy[key]=STATE[key];
+      return JSON.stringify(copy);
+    };
+    let knownOther=otherState();
+
+    function periodOf(row){
+      const p=String(row&&row.period||'').toUpperCase();
+      if(p==='AM'||p==='PM')return p;
+      const hour=Number(String(row&&row.ts||'').slice(11,13));
+      return Number.isFinite(hour)&&hour>=12?'PM':'AM';
+    }
+
+    persist=async function(reason){
+      if(!serverMode||!ME||ME.role!=='manager')return originalPersist(reason);
+      const currentTemps=Array.isArray(STATE.tempReadings)?STATE.tempReadings:[];
+      const additions=currentTemps.filter(r=>r&&r.id!=null&&!knownTempIds.has(String(r.id)));
+      const unrelatedChanged=otherState()!==knownOther;
+      if(!additions.length||unrelatedChanged)return originalPersist(reason);
+      if(additions.length>32)return originalPersist(reason);
+
+      const rows=[];
+      for(const row of additions){
+        const value=Number(row.value);
+        const ts=String(row.ts||'');
+        const appId=String(row.appId||'');
+        if(!appId||ts.length<16||!Number.isFinite(value))return originalPersist(reason);
+        rows.push({id:String(row.id),appId,value,ts,period:periodOf(row)});
+      }
+
+      try{
+        const res=await api('/api/temperature-paper-import/undo',{method:'POST',body:JSON.stringify({action:'save-historic',readings:rows})});
+        const replaced=new Set(additions.map(r=>String(r.id)));
+        STATE.tempReadings=currentTemps.filter(r=>!r||r.id==null||!replaced.has(String(r.id))).concat(Array.isArray(res.readings)?res.readings:[]);
+        REV=res.revision;
+        knownTempIds=new Set((STATE.tempReadings||[]).filter(r=>r&&r.id!=null).map(r=>String(r.id)));
+        knownOther=otherState();
+        DIRTY=false;ONLINE=true;
+        try{localStorage.removeItem(LS_QUEUE);}catch{}
+        updateSync();
+      }catch(err){
+        ONLINE=false;
+        try{localStorage.setItem(LS_QUEUE,JSON.stringify({state:STATE,ts:Date.now(),reason:reason||'temperature'}));}catch{}
+        updateSync();
+        toast((err&&err.message)||'Temperature save failed','bad');
+      }
+    };
+  }
+  installAtomicLiveTemperatureSave();
+})();
