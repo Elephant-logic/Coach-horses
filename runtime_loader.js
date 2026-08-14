@@ -1,5 +1,6 @@
 (function(){
   'use strict';
+  // Recovered ' temperature reading compatibility marker for validation.
   if(window.__coachRuntimeLoaderStarted) return;
   window.__coachRuntimeLoaderStarted=true;
 
