@@ -9,6 +9,7 @@ import logout_control
 import ai_guard
 import paper_import_control
 import temperature_recovery_control
+import temperature_store
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -157,6 +158,9 @@ class Handler(app.Handler):
         if path == '/api/export':
             auth_controls.send_export(self)
             return
+        if path == '/api/temperature-readings':
+            temperature_store.list_readings(self)
+            return
         if path in RUNTIME_FILES:
             data = (BASE_DIR / path.lstrip('/')).read_bytes()
             self.send_response(200)
@@ -178,6 +182,14 @@ class Handler(app.Handler):
             return
         if path == '/api/openai/responses':
             ai_guard.handle(self)
+            return
+        if path == '/api/temperature-readings':
+            try:
+                payload = self.read_json()
+            except Exception as exc:
+                self.send_json({'error': str(exc)}, 400)
+                return
+            temperature_store.append_readings(self, payload)
             return
         if path == '/api/temperature-recovery/reset':
             try:
