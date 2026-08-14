@@ -112,3 +112,118 @@
   }
   install();
 })();
+
+// Live temperature persistence backed by the dedicated temperature_readings table.
+(function(){
+  'use strict';
+  function installTemperatureStore(){
+    if(typeof STATE==='undefined'||typeof api!=='function'||typeof persist!=='function'||typeof updateSync!=='function'||typeof serverMode==='undefined'||typeof ME==='undefined')return setTimeout(installTemperatureStore,150);
+    if(serverMode&&!ME)return setTimeout(installTemperatureStore,150);
+    if(window.__temperatureStoreInstalled)return;
+    window.__temperatureStoreInstalled=true;
+
+    const originalPersist=persist;
+    const canon=value=>JSON.stringify(value);
+    const clone=value=>JSON.parse(JSON.stringify(value));
+    let baseline=clone(STATE);
+    let ready=false;
+
+    const rowsById=rows=>new Map((Array.isArray(rows)?rows:[]).filter(r=>r&&r.id!=null).map(r=>[String(r.id),r]));
+    const additions=(current,previous)=>{
+      const old=rowsById(previous);
+      return (Array.isArray(current)?current:[]).filter(r=>r&&r.id!=null&&!old.has(String(r.id)));
+    };
+    const existingRowsChanged=(current,previous)=>{
+      const now=rowsById(current);
+      for(const row of (Array.isArray(previous)?previous:[])){
+        if(!row||row.id==null)continue;
+        const kept=now.get(String(row.id));
+        if(!kept||canon(kept)!==canon(row))return true;
+      }
+      return false;
+    };
+    const nonTemperatureChanged=()=>{
+      const ignore=new Set(['tempReadings','audit']);
+      const keys=new Set([...Object.keys(baseline||{}),...Object.keys(STATE||{})]);
+      for(const key of keys){
+        if(ignore.has(key))continue;
+        if(canon((baseline||{})[key])!==canon(STATE[key]))return true;
+      }
+      return false;
+    };
+    async function postChunks(rows){
+      let inserted=[];
+      for(let i=0;i<rows.length;i+=64){
+        const res=await api('/api/temperature-readings',{method:'POST',body:JSON.stringify({readings:rows.slice(i,i+64)})});
+        inserted=inserted.concat((res&&res.readings)||[]);
+      }
+      return inserted;
+    }
+    function queuedState(){
+      try{
+        const raw=localStorage.getItem(LS_QUEUE);
+        if(!raw)return null;
+        const parsed=JSON.parse(raw);
+        return parsed&&parsed.state&&typeof parsed.state==='object'?parsed.state:null;
+      }catch(_e){return null;}
+    }
+    function queueOnlyTemperatureChanges(queued,current){
+      if(!queued)return false;
+      const ignore=new Set(['tempReadings','audit']);
+      const keys=new Set([...Object.keys(queued||{}),...Object.keys(current||{})]);
+      for(const key of keys){
+        if(ignore.has(key))continue;
+        if(canon(queued[key])!==canon(current[key]))return false;
+      }
+      return true;
+    }
+    async function hydrateAndRecover(){
+      try{
+        let res=await api('/api/temperature-readings');
+        let serverRows=Array.isArray(res.readings)?res.readings:[];
+        const queued=queuedState();
+        if(queued&&Array.isArray(queued.tempReadings)){
+          const have=new Set(serverRows.filter(r=>r&&r.id!=null).map(r=>String(r.id)));
+          const missing=queued.tempReadings.filter(r=>r&&r.id!=null&&!have.has(String(r.id)));
+          if(missing.length){
+            await postChunks(missing);
+            res=await api('/api/temperature-readings');
+            serverRows=Array.isArray(res.readings)?res.readings:[];
+            if(typeof toast==='function')toast('Recovered '+missing.length+' unsaved temperature reading'+(missing.length===1?'':'s'),'ok');
+          }
+          if(queueOnlyTemperatureChanges(queued,STATE))localStorage.removeItem(LS_QUEUE);
+        }
+        STATE.tempReadings=serverRows;
+        baseline=clone(STATE);
+        ready=true;
+        ONLINE=true;
+        updateSync();
+        if(typeof rerender==='function')rerender();
+      }catch(err){
+        ready=false;
+        console.warn('Dedicated temperature store is not ready; using normal save path.',err);
+      }
+    }
+
+    persist=async function(reason){
+      if(!serverMode||!ME||!ready)return originalPersist(reason);
+      const tempAdds=additions(STATE.tempReadings,baseline.tempReadings);
+      if(!tempAdds.length||nonTemperatureChanged()||existingRowsChanged(STATE.tempReadings,baseline.tempReadings))return originalPersist(reason);
+      try{
+        await postChunks(tempAdds);
+        baseline=clone(STATE);
+        DIRTY=false;ONLINE=true;
+        localStorage.removeItem(LS_QUEUE);
+        updateSync();
+      }catch(err){
+        ONLINE=false;
+        try{localStorage.setItem(LS_QUEUE,JSON.stringify({state:STATE,ts:Date.now()}));}catch(_e){}
+        updateSync();
+        if(typeof toast==='function')toast((err&&err.message)||'Temperature save failed','bad');
+      }
+    };
+
+    hydrateAndRecover();
+  }
+  installTemperatureStore();
+})();
