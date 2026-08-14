@@ -112,3 +112,23 @@
   }
   install();
 })();
+
+// The server exposes runtime_loader.js but does not inject it into the page.
+// Load it here because this file is already part of the final temperature script chain.
+(function(){
+  'use strict';
+  function loadFinalRuntime(){
+    if(window.__coachRuntimeLoaderStarted||document.querySelector('script[data-coach-runtime-loader]'))return;
+    const script=document.createElement('script');
+    script.src='/runtime_loader.js?v=20260814-savefix2';
+    script.async=false;
+    script.dataset.coachRuntimeLoader='1';
+    script.onerror=()=>{
+      console.error('Final temperature runtime failed to load');
+      if(typeof toast==='function')toast('Temperature save system failed to load','bad');
+    };
+    document.body.appendChild(script);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadFinalRuntime,{once:true});
+  else loadFinalRuntime();
+})();
