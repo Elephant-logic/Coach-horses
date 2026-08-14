@@ -54,19 +54,21 @@ def append_readings(handler, payload):
         row_id = str(row.get('id') or '').strip()
         app_id = str(row.get('appId') or '').strip()
         ts = str(row.get('ts') or '').strip()
+        try:
+            parsed_ts = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+        except Exception:
+            handler.send_json({'error': 'Temperature timestamp is invalid.'}, 400)
+            return
         period = str(row.get('period') or '').upper().strip()
+        if period not in ('AM', 'PM'):
+            period = 'AM' if parsed_ts.hour < 12 else 'PM'
         try:
             value = float(row.get('value'))
         except Exception:
             handler.send_json({'error': 'Temperature must be numeric.'}, 400)
             return
-        if not row_id or app_id not in valid_apps or not ts or period not in ('AM', 'PM') or value < -60 or value > 120:
+        if not row_id or app_id not in valid_apps or not ts or value < -60 or value > 120:
             handler.send_json({'error': 'Temperature reading is incomplete or invalid.'}, 400)
-            return
-        try:
-            datetime.fromisoformat(ts.replace('Z', '+00:00'))
-        except Exception:
-            handler.send_json({'error': 'Temperature timestamp is invalid.'}, 400)
             return
         item = dict(row)
         item['id'] = row_id
