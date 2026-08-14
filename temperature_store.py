@@ -19,16 +19,45 @@ def _public_row(row):
     return out
 
 
+def _sync_legacy_state(cur):
+    cur.execute(
+        """
+        INSERT INTO temperature_readings(id,app_id,value,ts,period,recorded_by,source,payload)
+        SELECT
+            coalesce(nullif(r->>'id',''), 'legacy-' || md5(r::text || ':' || ordinality::text)),
+            r->>'appId',
+            (r->>'value')::double precision,
+            (r->>'ts')::timestamptz,
+            case when upper(coalesce(r->>'period','')) in ('AM','PM') then upper(r->>'period')
+                 when extract(hour from (r->>'ts')::timestamptz) < 12 then 'AM' else 'PM' end,
+            coalesce(nullif(r->>'by',''), nullif(r->>'enteredBy',''), 'unknown'),
+            coalesce(nullif(r->>'source',''), 'legacy-state'),
+            r
+        FROM app_state a
+        CROSS JOIN LATERAL jsonb_array_elements(coalesce(a.state->'tempReadings','[]'::jsonb))
+            WITH ORDINALITY AS x(r, ordinality)
+        WHERE a.id=1
+          AND r ? 'appId'
+          AND r ? 'value'
+          AND r ? 'ts'
+          AND (r->>'value') ~ '^-?[0-9]+(\\.[0-9]+)?$'
+        ON CONFLICT (id) DO NOTHING
+        """
+    )
+
+
 def list_readings(handler):
     stored, _user = handler.require_user()
     if not stored:
         return
     with app.connect() as conn:
         with conn.cursor() as cur:
+            _sync_legacy_state(cur)
             cur.execute(
                 "SELECT id,app_id,value,ts,period,recorded_by,source,payload FROM temperature_readings ORDER BY ts ASC, id ASC"
             )
             rows = cur.fetchall()
+        conn.commit()
     handler.send_json({'ok': True, 'readings': [_public_row(row) for row in rows]})
 
 
