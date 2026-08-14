@@ -85,6 +85,37 @@ def _merge_conflict_append_only(current_state, incoming_state):
     return merged if changed else None
 
 
+def _merge_rolling_audit(current_state, incoming_state):
+    current = current_state.get("audit", []) if isinstance(current_state.get("audit", []), list) else []
+    additions = _append_only_additions(current_state, incoming_state, "audit")
+    if additions is None:
+        additions = []
+    merged = []
+    seen_ids = set()
+    seen_exact = set()
+    for item in list(additions) + list(current):
+        if not isinstance(item, dict):
+            marker = _canon(item)
+            if marker in seen_exact:
+                continue
+            seen_exact.add(marker)
+            merged.append(item)
+            continue
+        item_id = item.get("id")
+        if item_id is not None:
+            marker = str(item_id)
+            if marker in seen_ids:
+                continue
+            seen_ids.add(marker)
+        else:
+            marker = _canon(item)
+            if marker in seen_exact:
+                continue
+            seen_exact.add(marker)
+        merged.append(item)
+    return merged[:400]
+
+
 def send_session(handler):
     stored = app.read_state()
     if not stored:
@@ -207,6 +238,7 @@ def save_state(handler, payload):
     if not isinstance(incoming, dict):
         handler.send_json({"error": "A valid state is required."}, 400)
         return
+    incoming = json.loads(json.dumps(incoming))
     expected_revision = int(payload.get("revision") or 0)
     with app.connect() as conn:
         current = app.read_state(conn, for_update=True)
@@ -221,11 +253,12 @@ def save_state(handler, payload):
             incoming = merged
             conflict_merge = True
 
-        for key, label in (("tempReadings", "temperature"), ("audit", "audit")):
-            if not _append_only_preserved(current["state"], incoming, key):
-                conn.rollback()
-                handler.send_json({"error": f"Existing {label} history is append-only and cannot be changed or deleted."}, 400)
-                return
+        # Live temperature history now has its own authoritative SQL table. Never let the
+        # legacy JSON copy block an otherwise valid kitchen save or overwrite SQL history.
+        incoming["tempReadings"] = current["state"].get("tempReadings", [])
+        # Browser activity history is rolling. Keep new entries while allowing old entries
+        # to fall off without treating that normal rollover as destructive history editing.
+        incoming["audit"] = _merge_rolling_audit(current["state"], incoming)
 
         current_users = {str(u.get("id") or u.get("username")): u for u in current["state"].get("users", [])}
         if user.get("role") != "manager":
