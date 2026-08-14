@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: '22'
       - name: Python syntax
-        run: python -m py_compile app.py server.py startup_history.py auth_controls.py logout_control.py ai_guard.py
+        run: python -m py_compile app.py server.py startup_history.py auth_controls.py logout_control.py ai_guard.py temperature_store.py
       - name: JavaScript syntax
         shell: bash
         run: |
@@ -57,6 +57,8 @@ jobs:
           core=Path('core_workflow_stability.js').read_text()
           auth=Path('auth_controls.py').read_text()
           ai=Path('ai_guard.py').read_text()
+          temp_store=Path('temperature_store.py').read_text()
+          runtime=Path('runtime_loader.js').read_text()
 
           for needle in [
               'Command de Cuisine — The Coach &amp; Horses',
@@ -127,14 +129,27 @@ jobs:
               assert needle in core, f'missing consolidated workflow contract: {needle}'
 
           for needle in [
-              "def _append_only_preserved", 'Existing {label} history is append-only',
-              '("tempReadings", "temperature")', '("audit", "audit")',
+              "def _append_only_preserved", "def _merge_rolling_audit",
+              'incoming["tempReadings"] = current["state"].get("tempReadings", [])',
+              'incoming["audit"] = _merge_rolling_audit',
               "user.pop(\"password\", None)", "def change_password", "def manage_user",
               "Manager access required.", "There must always be at least one active manager.",
               "incoming[\"users\"] = current[\"state\"].get(\"users\", [])",
               "incoming[\"settings\"] = current[\"state\"].get(\"settings\", {})"
           ]:
               assert needle in auth, f'missing auth/compliance control: {needle}'
+
+          for needle in [
+              'def list_readings', 'def append_readings', 'temperature_readings',
+              'ON CONFLICT (id) DO NOTHING', 'append_temperature_readings'
+          ]:
+              assert needle in temp_store, f'missing temperature store contract: {needle}'
+
+          for needle in [
+              'installFinalTemperaturePersistence', '/api/temperature-readings',
+              'Recovered '+"'"+' temperature reading', 'window.__finalTemperaturePersist'
+          ]:
+              assert needle in runtime, f'missing final temperature persistence contract: {needle}'
 
           for needle in [
               'ALLOWED_MODELS = {"gpt-4o-mini", "gpt-4.1-mini"}',
@@ -157,6 +172,7 @@ jobs:
           assert "path == '/api/session'" in server and "auth_controls.send_session" in server
           assert "path == '/api/logout'" in server and 'logout_control.logout(self)' in server
           assert "path == '/api/openai/responses'" in server and 'ai_guard.handle(self)' in server
+          assert "path == '/api/temperature-readings'" in server and 'temperature_store.append_readings' in server
           assert "'/api/login', '/api/password/change', '/api/users/manage'" in server
           assert 'auth_controls.save_state' in server
           assert 'python server.py' in Path('render.yaml').read_text()
